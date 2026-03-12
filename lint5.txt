@@ -1,0 +1,7 @@
+
+O:\Ammarli_Project\Ammarli-call-truck\app\order-confirmation.tsx
+  108:62  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  108:76  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+✖ 2 problems (2 errors, 0 warnings)
+
