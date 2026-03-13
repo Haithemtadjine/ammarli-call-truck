@@ -1,16 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+    Alert,
+    Animated,
+    Modal,
     ScrollView,
     StatusBar,
     StyleSheet,
     Switch,
     Text,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import DriverBottomNav from '../src/components/DriverBottomNav';
 import { DriverOrder, useAppStore } from '../src/store/useAppStore';
 
 // ─── Theme ─────────────────────────────────────────────────────────────────────
@@ -68,7 +73,9 @@ const BOTTLED_DATA = {
 // ── TANKER INVENTORY ──────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════════
 function TankerInventory() {
-    const { remaining, total, waterType } = TANKER_DATA.tank;
+    const inventory = useAppStore((s) => s.inventory.tanker);
+    const refillStock = useAppStore((s) => s.refillStock);
+    const { remaining, total, waterType } = inventory;
     const pct = remaining / total; // 0-1
     const pctLabel = `${Math.round(pct * 100)}%`;
 
@@ -96,7 +103,10 @@ function TankerInventory() {
             </View>
 
             {/* Refill button */}
-            <TouchableOpacity style={styles.refillOutlinedBtn}>
+            <TouchableOpacity 
+                style={styles.refillOutlinedBtn}
+                onPress={() => refillStock('tanker', 5000)}
+            >
                 <Ionicons name="nuclear-outline" size={18} color={NAVY} style={{ marginRight: 8 }} />
                 <Text style={styles.refillOutlinedText}>REFILL TANK</Text>
             </TouchableOpacity>
@@ -108,19 +118,25 @@ function TankerInventory() {
 // ── BOTTLED INVENTORY ─────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════════
 function BottledInventory() {
+    const inventory = useAppStore((s) => s.inventory.bottled);
+    const refillStock = useAppStore((s) => s.refillStock);
+
     return (
         <View style={styles.card}>
             <View style={styles.row}>
                 <Text style={styles.cardTitle}>Current Stock</Text>
-                <TouchableOpacity style={styles.refillSmallBtn}>
+                <TouchableOpacity 
+                    style={styles.refillSmallBtn}
+                    onPress={() => refillStock('bottled', { size: '1.5L', qty: 50 })} // Simplified refill for now
+                >
                     <Text style={styles.refillSmallText}>Refill Stock</Text>
                 </TouchableOpacity>
             </View>
             <View style={[styles.row, { justifyContent: 'space-around', marginTop: 18 }]}>
-                {BOTTLED_DATA.stock.map((item) => (
+                {inventory.stock.map((item) => (
                     <View key={item.size} style={styles.stockCol}>
                         <View style={styles.stockIconBox}>
-                            <Ionicons name={item.icon} size={26} color={NAVY} />
+                            <Ionicons name={item.icon as any} size={26} color={NAVY} />
                         </View>
                         <Text style={styles.stockSizeLabel}>{item.size}</Text>
                         <Text style={styles.stockQtyText}>
@@ -137,113 +153,81 @@ function BottledInventory() {
 // ══════════════════════════════════════════════════════════════════════════════
 // ── ORDER CARD ── (wired to store + navigation)
 // ══════════════════════════════════════════════════════════════════════════════
-function OrderCard({
+// ─── Incoming Order Overlay (The Modal) ──────────────────────────────────────────
+function IncomingOrderOverlay({
     order,
-    isTanker,
+    onAccept,
+    onDecline,
+    visible,
+    timer,
 }: {
-    order: (typeof TANKER_DATA.orders)[0];
-    isTanker: boolean;
+    order: any;
+    onAccept: () => void;
+    onDecline: () => void;
+    visible: boolean;
+    timer: number;
 }) {
-    const router = useRouter();
-    const acceptDriverOrder = useAppStore((s) => s.acceptDriverOrder);
-    const [declined, setDeclined] = useState(false);
-
-    if (declined) {
-        return (
-            <View style={[styles.orderCard, { alignItems: 'center', paddingVertical: 32 }]}>
-                <Ionicons name="close-circle" size={60} color="#EF4444" />
-                <Text style={[styles.cardTitle, { color: '#EF4444', marginTop: 12 }]}>Request Declined</Text>
-                <Text style={{ color: GRAY, marginTop: 6 }}>Waiting for next request…</Text>
-            </View>
-        );
-    }
-
-    const handleAccept = () => {
-        // Build a DriverOrder from the mock data
-        const driverOrder: DriverOrder = {
-            orderId: String(Math.floor(80000 + Math.random() * 9999)),
-            customer: { name: order.customer, phone: '+213 555 00 00 00' },
-            deliveryAddress: {
-                label: `${order.distance} — Batna, Algeria`,
-                distance: order.distance,
-                lat: 35.5596,
-                lng: 6.1740,
-            },
-            driverLat: 35.5620,
-            driverLng: 6.1700,
-            items: [{
-                icon: isTanker ? 'car' : 'cube',
-                description: order.item,
-                detail: order.detail,
-                price: order.earnings,
-            }],
-            subtotal: order.earnings,
-            deliveryFee: 150,
-            total: order.earnings + 150,
-            status: 'accepted',
-            createdAt: new Date().toLocaleDateString('fr-DZ') + ' • ' + new Date().toLocaleTimeString('fr-DZ', { hour: '2-digit', minute: '2-digit' }),
-        };
-        acceptDriverOrder(driverOrder);
-        router.push('/driver-active-delivery');
-    };
+    if (!order) return null;
 
     return (
-        <View style={styles.orderCard}>
-            {/* Customer row */}
-            <View style={styles.orderTopRow}>
-                {/* Avatar */}
-                <View style={styles.orderAvatar}>
-                    <Ionicons name="person" size={22} color={NAVY} />
-                </View>
-                <View style={{ flex: 1, marginHorizontal: 12 }}>
-                    <Text style={styles.orderCustomerName}>{order.customer}</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                        <Ionicons name="location-outline" size={12} color={GRAY} />
-                        <Text style={styles.orderDistance}> {order.distance}</Text>
+        <Modal visible={visible} transparent animationType="slide">
+            <View style={styles.incomingOverlay}>
+                <View style={styles.incomingCard}>
+                    {/* Row 1: Customer & Price */}
+                    <View style={styles.row}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                            <View style={styles.orangeAvatarBox}>
+                                <Ionicons name="person" size={24} color={WHITE} />
+                            </View>
+                            <View style={{ marginLeft: 12 }}>
+                                <Text style={styles.incomingName}>{order.customer}</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                                    <Text style={styles.incomingRating}>⭐️ 4.8</Text>
+                                    <Text style={styles.dotSeparator}> · </Text>
+                                    <Text style={styles.incomingDist}>{order.distance} away</Text>
+                                </View>
+                            </View>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={styles.newOrderBadge}>NEW ORDER</Text>
+                            <Text style={styles.incomingPrice}>{order.earnings.toLocaleString()} DA</Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.divider} />
+
+                    {/* Row 2: Order Detail */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={styles.dropIconBox}>
+                            <Ionicons name="water" size={20} color="#F97316" />
+                        </View>
+                        <View style={{ marginLeft: 14 }}>
+                            <Text style={styles.incomingItemName}>{order.item}</Text>
+                            <Text style={styles.incomingSubtitle}>{order.locationName}</Text>
+                        </View>
+                    </View>
+
+                    {/* Row 3: Timer Text */}
+                    <View style={styles.timerRow}>
+                        <Ionicons name="time-outline" size={16} color={GRAY} />
+                        <Text style={styles.timerText}>REQUEST EXPIRES IN {timer}S</Text>
+                    </View>
+
+                    {/* Row 4: Actions */}
+                    <View style={styles.incomingActions}>
+                        <TouchableOpacity style={styles.acceptCircularBtn} onPress={onAccept}>
+                            <View style={styles.acceptInner}>
+                                <Text style={styles.acceptText}>ACCEPT</Text>
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity onPress={onDecline}>
+                            <Text style={styles.declineTextBtn}>DECLINE</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
-                <View>
-                    <Text style={styles.earningsLabel}>EARNINGS</Text>
-                    <Text style={styles.earningsGreen}>{order.earnings.toLocaleString()} DA</Text>
-                </View>
             </View>
-
-            {/* Item box */}
-            <View style={styles.orderItemBox}>
-                <View style={styles.orderItemIcon}>
-                    <Ionicons
-                        name={isTanker ? 'car' : 'cube'}
-                        size={22}
-                        color={BLUE}
-                    />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={styles.orderItemTitle}>{order.item}</Text>
-                    <Text style={styles.orderItemSub}>{order.detail}</Text>
-                </View>
-            </View>
-
-            {/* Action row */}
-            <View style={styles.orderActionsRow}>
-                {/* Decline */}
-                <TouchableOpacity
-                    style={styles.declineSquare}
-                    onPress={() => setDeclined(true)}
-                >
-                    <Ionicons name="close" size={22} color="#374151" />
-                </TouchableOpacity>
-
-                {/* Accept */}
-                <TouchableOpacity
-                    style={styles.acceptYellowBtn}
-                    onPress={handleAccept}
-                    activeOpacity={0.85}
-                >
-                    <Text style={styles.acceptYellowText}>ACCEPT ORDER</Text>
-                    <Ionicons name="arrow-forward" size={18} color={NAVY} style={{ marginLeft: 8 }} />
-                </TouchableOpacity>
-            </View>
-        </View>
+        </Modal>
     );
 }
 
@@ -267,15 +251,143 @@ export default function DriverHomeScreen() {
     const registeredDriver = useAppStore((s) => s.registeredDriver);
     const [isOnline, setIsOnline] = useState(true);
 
+    // ── Smart Logic State ───────────────────────────────────────────────────
+    const [userLoc, setUserLoc] = useState<Location.LocationObject | null>(null);
+    const [cityName, setCityName] = useState('Batna');
+    const [incomingOrder, setIncomingOrder] = useState<any>(null);
+    const [timer, setTimer] = useState(15);
+    const orderIntervalRef = useRef<any>(null);
+    const modalTimerRef = useRef<any>(null);
+
     const driverType = registeredDriver?.driverType ?? 'Tanker';
+    const waterType = registeredDriver?.waterType ?? 'Spring';
     const driverName = registeredDriver?.name || 'Driver';
-    const firstName = driverName.split(' ')[0]; // e.g. 'Ahmed' from 'Ahmed Boudiaf'
+    const firstName = driverName.split(' ')[0];
     const isTanker = driverType === 'Tanker';
 
     const data = isTanker ? TANKER_DATA : BOTTLED_DATA;
     const earnings = data.earnings;
     const completed = data.completed;
-    const orders = data.orders;
+
+    // ── 1. Setup Location & Geocoding ───────────────────────────────────────
+    useEffect(() => {
+        (async () => {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') return;
+            
+            const loc = await Location.getCurrentPositionAsync({});
+            setUserLoc(loc);
+            
+            const geo = await Location.reverseGeocodeAsync(loc.coords);
+            if (geo.length > 0) {
+                setCityName(geo[0].city || geo[0].district || geo[0].region || 'Batna');
+            }
+        })();
+    }, []);
+
+    // ── 2. Smart Order Generation Helper ────────────────────────────────────
+    const generateSmartOrder = () => {
+        const names = ['Mohamed', 'Lamine', 'Yassine', 'Sami', 'Hichem', 'Abdou'];
+        const districts = ['Sector 4', 'North District', 'Cité Azhar', 'El Mouradia', 'Downtown'];
+        
+        const latBase = userLoc?.coords.latitude || 35.55;
+        const lngBase = userLoc?.coords.longitude || 6.17;
+        
+        // Offset 1-3km
+        const latOff = (Math.random() * 0.01 + 0.005) * (Math.random() > 0.5 ? 1 : -1);
+        const lngOff = (Math.random() * 0.01 + 0.005) * (Math.random() > 0.5 ? 1 : -1);
+
+        const distKm = Math.sqrt(Math.pow(latOff * 111, 2) + Math.pow(lngOff * 111, 2)).toFixed(1);
+        
+        let itemLabel = '';
+        if (isTanker) {
+            itemLabel = `3000L ${waterType} Water`;
+        } else {
+            const bottledItems = [
+                '10x 1.5L Packs (Ifri)',
+                '20x 0.5L Packs (Lalla Khedidja)',
+                '5x 5L Jerrycans (Saida)',
+                '12x 2L Bottles (Guedila)'
+            ];
+            itemLabel = bottledItems[Math.floor(Math.random() * bottledItems.length)];
+        }
+
+        return {
+            id: String(Math.floor(Math.random() * 90000) + 10000),
+            customer: names[Math.floor(Math.random() * names.length)],
+            distance: `${distKm} km`,
+            item: itemLabel,
+            locationName: `${cityName} - ${districts[Math.floor(Math.random() * districts.length)]}`,
+            earnings: isTanker ? 2500 : 1250,
+            coords: { lat: latBase + latOff, lng: lngBase + lngOff }
+        };
+    };
+
+    // ── 3. Interval & Timer Logic ───────────────────────────────────────────
+    useEffect(() => {
+        if (isOnline) {
+            // Check once every 60s
+            orderIntervalRef.current = setInterval(() => {
+                if (!incomingOrder) {
+                    const newOrder = generateSmartOrder();
+                    setIncomingOrder(newOrder);
+                    setTimer(15);
+                }
+            }, 60000); // 1 minute
+        } else {
+            clearInterval(orderIntervalRef.current);
+            setIncomingOrder(null);
+        }
+        return () => clearInterval(orderIntervalRef.current);
+    }, [isOnline, incomingOrder, userLoc, cityName]);
+
+    useEffect(() => {
+        if (incomingOrder) {
+            modalTimerRef.current = setInterval(() => {
+                setTimer((t) => {
+                    if (t <= 1) {
+                        clearInterval(modalTimerRef.current);
+                        setIncomingOrder(null);
+                        return 15;
+                    }
+                    return t - 1;
+                });
+            }, 1000);
+        } else {
+            clearInterval(modalTimerRef.current);
+        }
+        return () => clearInterval(modalTimerRef.current);
+    }, [incomingOrder]);
+
+    const handleAccept = () => {
+        const order = incomingOrder;
+        const driverOrder: DriverOrder = {
+            orderId: order.id,
+            customer: { name: order.customer, phone: '+213 555 00 00 00' },
+            deliveryAddress: {
+                label: order.locationName,
+                distance: order.distance,
+                lat: order.coords.lat,
+                lng: order.coords.lng,
+            },
+            driverLat: userLoc?.coords.latitude || 35.56,
+            driverLng: userLoc?.coords.longitude || 6.17,
+            items: [{
+                icon: isTanker ? 'car' : 'cube',
+                description: order.item,
+                detail: isTanker ? 'Bulk Delivery' : 'Mineral Water',
+                price: order.earnings,
+            }],
+            subtotal: order.earnings,
+            deliveryFee: 150,
+            total: order.earnings + 150,
+            status: 'accepted',
+            createdAt: new Date().toLocaleDateString('fr-DZ') + ' • ' + new Date().toLocaleTimeString('fr-DZ', { hour: '2-digit', minute: '2-digit' }),
+        };
+        useAppStore.getState().acceptDriverOrder(driverOrder);
+        setIncomingOrder(null);
+        router.push('/driver-order-review');
+    };
 
     // Time-based greeting
     const h = new Date().getHours();
@@ -353,41 +465,16 @@ export default function DriverHomeScreen() {
                 {/* ════════════════ INVENTORY ════════════════ */}
                 {isTanker ? <TankerInventory /> : <BottledInventory />}
 
-                {/* ════════════════ NEW REQUESTS ════════════════ */}
-                <View style={styles.requestsHeaderRow}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Ionicons name="notifications" size={20} color={NAVY} />
-                        <Text style={styles.requestsTitle}>New Requests </Text>
-                        <Text style={styles.requestsCity}>(Batna)</Text>
+                {/* ════════════════ CHART PLACEHOLDER ════════════════ */}
+                <View style={styles.card}>
+                    <Text style={styles.cardTitle}>Daily Performance</Text>
+                    <View style={{ height: 180, backgroundColor: '#F9FAFB', borderRadius: 16, marginTop: 15, justifyContent: 'center', alignItems: 'center' }}>
+                        <Ionicons name="stats-chart" size={40} color="#E5E7EB" />
+                        <Text style={{ color: GRAY, fontSize: 13, marginTop: 10 }}>Chart visualization available in production</Text>
                     </View>
-                    <TouchableOpacity>
-                        <Text style={styles.seeAllText}>SEE ALL</Text>
-                    </TouchableOpacity>
                 </View>
 
-                {isOnline ? (
-                    <>
-                        {orders.map((order) => (
-                            <OrderCard key={order.id} order={order} isTanker={isTanker} />
-                        ))}
-
-                        {/* ── Nearby mini list (Tanker only) */}
-                        {isTanker && TANKER_DATA.nearby.map((n, i) => (
-                            <TouchableOpacity key={i} style={styles.nearbyRow}>
-                                <View style={styles.nearbyAvatar}>
-                                    <Ionicons name="person-outline" size={18} color={GRAY} />
-                                </View>
-                                <View style={{ flex: 1, marginLeft: 12 }}>
-                                    <Text style={styles.nearbyName}>{n.name}</Text>
-                                    <Text style={styles.nearbyDetail}>{n.distance} • {n.size}</Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={18} color={GRAY} />
-                            </TouchableOpacity>
-                        ))}
-                    </>
-                ) : (
-                    <OfflineState />
-                )}
+                {!isOnline && <OfflineState />}
 
                 {/* Logout */}
                 <TouchableOpacity
@@ -400,26 +487,87 @@ export default function DriverHomeScreen() {
             </ScrollView>
 
             {/* ════════════════ BOTTOM NAV ════════════════ */}
-            <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-                {[
-                    { icon: 'grid', label: 'DASH', active: true },
-                    { icon: 'car-outline', label: 'TRIPS', active: false },
-                    { icon: 'wallet-outline', label: 'WALLET', active: false },
-                    { icon: 'person-outline', label: 'PROFILE', active: false },
-                ].map((tab) => (
-                    <TouchableOpacity key={tab.label} style={styles.navTab}>
-                        <Ionicons
-                            name={tab.icon as any}
-                            size={24}
-                            color={tab.active ? NAVY : '#9CA3AF'}
-                        />
-                        <Text style={[styles.navLabel, tab.active && { color: NAVY }]}>
-                            {tab.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+            <DriverBottomNav activeTab="dashboard" />
+
+            {/* ════════════════ OVERLAYS ════════════════ */}
+            <IncomingOrderOverlay 
+                order={incomingOrder}
+                visible={!!incomingOrder}
+                timer={timer}
+                onAccept={handleAccept}
+                onDecline={() => setIncomingOrder(null)}
+            />
+
+            {/* ════════════════ RATING MODAL ════════════════ */}
+            <RatingModal />
         </View>
+    );
+}
+
+// ─── Rating Modal Component ───────────────────────────────────────────────────
+function RatingModal() {
+    const { showRatingModal, setShowRatingModal } = useAppStore();
+    const [rating, setRating] = useState(0);
+
+    const handleSubmit = () => {
+        if (rating === 0) {
+            Alert.alert('Selection Required', 'Please select a star rating first.');
+            return;
+        }
+        setShowRatingModal(false);
+        setRating(0);
+        Alert.alert('Thank You!', 'Your rating has been submitted successfully.');
+    };
+
+    return (
+        <Modal
+            visible={showRatingModal}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowRatingModal(false)}
+        >
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalCard}>
+                    <View style={styles.modalIconBox}>
+                        <Ionicons name="star" size={32} color={YELLOW} />
+                    </View>
+                    <Text style={styles.modalTitle}>Rate the Customer</Text>
+                    <Text style={styles.modalSub}>How was your experience with this delivery?</Text>
+
+                    {/* Star Rating Row */}
+                    <View style={styles.starsRow}>
+                        {[1, 2, 3, 4, 5].map((s) => (
+                            <TouchableOpacity
+                                key={s}
+                                onPress={() => setRating(s)}
+                                activeOpacity={0.7}
+                            >
+                                <Ionicons
+                                    name={rating >= s ? 'star' : 'star-outline'}
+                                    size={42}
+                                    color={rating >= s ? YELLOW : '#D1D5DB'}
+                                />
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    <TouchableOpacity 
+                        style={[styles.modalSubmitBtn, rating === 0 && { opacity: 0.5 }]} 
+                        onPress={handleSubmit}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={styles.modalSubmitText}>Submit Rating</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                        style={styles.modalCloseBtn} 
+                        onPress={() => setShowRatingModal(false)}
+                    >
+                        <Text style={styles.modalCloseText}>Skip for now</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </Modal>
     );
 }
 
@@ -694,22 +842,117 @@ const styles = StyleSheet.create({
     },
     logoutText: { fontSize: 14, fontWeight: 'bold', color: '#EF4444' },
 
-    // ── Bottom nav
-    bottomNav: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        flexDirection: 'row',
-        backgroundColor: WHITE,
-        borderTopWidth: 1,
-        borderTopColor: BORDER,
-        paddingTop: 10,
-    },
-    navTab: {
+    // ── Incoming Order Overlay
+    incomingOverlay: {
         flex: 1,
-        alignItems: 'center',
-        gap: 4,
+        backgroundColor: 'rgba(0,0,0,0.35)',
+        justifyContent: 'flex-end',
+        paddingBottom: 20,
     },
-    navLabel: { fontSize: 10, fontWeight: '700', color: '#9CA3AF', letterSpacing: 0.3 },
+    incomingCard: {
+        backgroundColor: WHITE,
+        borderTopLeftRadius: 40,
+        borderTopRightRadius: 40,
+        borderBottomLeftRadius: 40,
+        borderBottomRightRadius: 40,
+        marginHorizontal: 15,
+        padding: 30,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -10 },
+        shadowOpacity: 0.15,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    orangeAvatarBox: {
+        width: 60, height: 60,
+        borderRadius: 30,
+        backgroundColor: '#F97316',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    incomingName: { fontSize: 22, fontWeight: 'bold', color: NAVY },
+    incomingRating: { fontSize: 14, color: '#F97316', fontWeight: 'bold' },
+    dotSeparator: { fontSize: 14, color: GRAY },
+    incomingDist: { fontSize: 14, color: GRAY, fontWeight: '500' },
+    newOrderBadge: { fontSize: 10, fontWeight: '900', color: '#F97316', letterSpacing: 1, marginBottom: 5 },
+    incomingPrice: { fontSize: 26, fontWeight: 'bold', color: NAVY },
+    divider: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 25 },
+    dropIconBox: {
+        width: 48, height: 48,
+        borderRadius: 16,
+        backgroundColor: '#FFF7ED',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    incomingItemName: { fontSize: 18, fontWeight: 'bold', color: NAVY },
+    incomingSubtitle: { fontSize: 14, color: GRAY, marginTop: 2 },
+    timerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 30, gap: 8 },
+    timerText: { fontSize: 12, fontWeight: 'bold', color: GRAY, letterSpacing: 1 },
+    incomingActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 35,
+    },
+    acceptCircularBtn: {
+        width: 140,
+        height: 140,
+        borderRadius: 70,
+        backgroundColor: NAVY,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    acceptInner: {
+        width: 124,
+        height: 124,
+        borderRadius: 62,
+        backgroundColor: YELLOW,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    acceptText: { fontSize: 22, fontWeight: '900', color: NAVY },
+    declineTextBtn: { fontSize: 16, fontWeight: 'bold', color: GRAY, marginRight: 20 },
+
+    // ── Rating Modal
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+    },
+    modalCard: {
+        backgroundColor: WHITE,
+        borderRadius: 28,
+        padding: 30,
+        width: '100%',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.2,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    modalIconBox: {
+        width: 70, height: 70,
+        borderRadius: 35,
+        backgroundColor: '#FFFBEB',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: { fontSize: 22, fontWeight: 'bold', color: NAVY, marginBottom: 8 },
+    modalSub: { fontSize: 14, color: GRAY, textAlign: 'center', marginBottom: 24, lineHeight: 20 },
+    starsRow: { flexDirection: 'row', gap: 10, marginBottom: 30 },
+    modalSubmitBtn: {
+        backgroundColor: NAVY,
+        width: '100%',
+        paddingVertical: 16,
+        borderRadius: 16,
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    modalSubmitText: { fontSize: 16, fontWeight: 'bold', color: WHITE },
+    modalCloseBtn: { paddingVertical: 8 },
+    modalCloseText: { fontSize: 14, fontWeight: '600', color: GRAY },
 });

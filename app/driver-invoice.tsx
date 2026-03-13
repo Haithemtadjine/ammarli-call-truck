@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
     ScrollView,
-    Share,
     StatusBar,
     StyleSheet,
     Text,
@@ -13,274 +13,291 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore } from '../src/store/useAppStore';
 
-// ─── Theme ─────────────────────────────────────────────────────────────────────
+// ─── Theme Constants ───────────────────────────────────────────────────────────
 const NAVY = '#003366';
 const YELLOW = '#F3CD0D';
-const BG = '#F5F7FA';
 const WHITE = '#FFFFFF';
-const GRAY = '#6B7280';
-const GREEN = '#10B981';
+const GRAY = '#8E98A8'; 
 const BORDER = '#E5E7EB';
+const LIGHT_BG = '#F8F9FA';
 
-export default function DriverInvoiceScreen() {
+export default function DriverInvoiceModal() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { activeDriverOrder, completeDriverOrder } = useAppStore();
+    const { activeDriverOrder, completeDriverOrder, setShowRatingModal } = useAppStore();
 
-    // Fallback mock so the screen is always previewable during development
+    // Fallback data
     const order = activeDriverOrder ?? {
-        orderId: '84291',
-        customer: { name: 'Ahmed Benali', phone: '+213 555 12 34 56' },
-        deliveryAddress: {
-            label: '2.5 km away — Batna, Algeria',
-            distance: '2.5 km',
-            lat: 35.5596,
-            lng: 6.1740,
-        },
-        driverLat: 35.5620,
-        driverLng: 6.1700,
-        items: [
-            { icon: 'cube', description: '5x 1.5L Packs (Ifri)', detail: 'Mineral Water', price: 1100 },
-        ],
-        subtotal: 1100,
-        deliveryFee: 150,
-        total: 1250,
-        status: 'completed' as const,
-        createdAt: new Date().toLocaleDateString('fr-DZ') + ' • ' + new Date().toLocaleTimeString('fr-DZ', { hour: '2-digit', minute: '2-digit' }),
+        orderId: '28491',
+        customer: { name: 'Yassine' },
+        items: [{ description: '3000L Spring Water' }],
+        deliveryAddress: { distance: '4.2 km' },
+        subtotal: 2450,
+        deliveryFee: 50,
+        total: 2500,
     };
 
-    const handleShare = async () => {
-        const lines = [
-            `🧾 Delivery Invoice — Ammarli`,
-            `Order #${order.orderId} | ${order.createdAt}`,
-            `Customer: ${order.customer.name} | ${order.customer.phone}`,
-            `Address: ${order.deliveryAddress.label}`,
-            ``,
-            ...order.items.map((i) => `• ${i.description} — ${i.price.toLocaleString()} DA`),
-            ``,
-            `Subtotal:     ${order.subtotal.toLocaleString()} DA`,
-            `Delivery Fee: ${order.deliveryFee.toLocaleString()} DA`,
-            `TOTAL:        ${order.total.toLocaleString()} DA`,
-        ].join('\n');
-        await Share.share({ message: lines });
-    };
-
-    const handleDone = () => {
+    const handleBackToDashboard = () => {
+        // Execute the exact logical sequence required
         completeDriverOrder();
+        useAppStore.getState().completeOrder(); // Also reset customer active order if any
+        setShowRatingModal(true);
         router.replace('/driver-home');
     };
 
     return (
-        <View style={[styles.root, { paddingTop: insets.top }]}>
+        <View style={styles.root}>
             <StatusBar barStyle="dark-content" />
+            
+            {/* 1. Foggy Background Effect */}
+            <BlurView intensity={70} tint="light" style={StyleSheet.absoluteFill} />
 
-            {/* Header */}
-            <View style={styles.header}>
-                <View style={{ width: 40 }} />
-                <Text style={styles.headerTitle}>Invoice</Text>
-                <TouchableOpacity onPress={handleShare} style={styles.shareBtn}>
-                    <Ionicons name="share-social-outline" size={22} color={NAVY} />
-                </TouchableOpacity>
-            </View>
-
-            <ScrollView
-                contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]}
-                showsVerticalScrollIndicator={false}
-            >
-                {/* ── SUCCESS BANNER */}
-                <View style={styles.successBanner}>
-                    <View style={styles.successIconCircle}>
-                        <Ionicons name="checkmark-sharp" size={40} color={NAVY} />
-                    </View>
-                    <Text style={styles.successTitle}>Delivered Successfully!</Text>
-                    <Text style={styles.successSub}>Payment confirmed • Thank you</Text>
-                </View>
-
-                {/* ── ORDER META */}
-                <View style={styles.metaCard}>
-                    <MetaRow label="Order ID" value={`#${order.orderId}`} />
-                    <MetaRow label="Date" value={order.createdAt} />
-                    <MetaRow label="Status" value="Completed" green />
-                    <MetaRow label="Customer" value={order.customer.name} />
-                    <MetaRow label="Phone" value={order.customer.phone} />
-                    <MetaRow label="Drop-off" value={order.deliveryAddress.label} last />
-                </View>
-
-                {/* ── ORDER ITEMS */}
-                <SectionLabel text="ORDER ITEMS" />
-                <View style={styles.itemsCard}>
-                    {order.items.map((item, i) => (
-                        <View
-                            key={i}
-                            style={[
-                                styles.itemRow,
-                                i > 0 && { borderTopWidth: 1, borderTopColor: BORDER, paddingTop: 14, marginTop: 14 },
-                            ]}
-                        >
-                            <View style={styles.itemIconBox}>
-                                <Ionicons name={item.icon as any} size={20} color={NAVY} />
+            <View style={[styles.container, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
+                
+                <ScrollView 
+                    contentContainerStyle={styles.scroll}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {/* 2. Main White Card */}
+                    <View style={styles.mainCard}>
+                        
+                        {/* Header: Success Icon & Titles */}
+                        <View style={styles.headerSection}>
+                            <View style={styles.successIconOuter}>
+                                <View style={styles.successIconCircle}>
+                                    <Ionicons name="checkmark" size={40} color={WHITE} />
+                                </View>
                             </View>
-                            <View style={{ flex: 1, marginLeft: 12 }}>
-                                <Text style={styles.itemDesc}>{item.description}</Text>
-                                <Text style={styles.itemDetail}>{item.detail}</Text>
-                            </View>
-                            <Text style={styles.itemPrice}>{item.price.toLocaleString()} DA</Text>
+                            
+                            <Text style={styles.titleText}>Trip Completed{"\n"}Successfully!</Text>
+                            <Text style={styles.subtitleText}>Your delivery has been safely handed over.</Text>
                         </View>
-                    ))}
-                </View>
 
-                {/* ── PRICING BREAKDOWN */}
-                <View style={styles.pricingCard}>
-                    <PricingRow label="Subtotal" value={order.subtotal} />
-                    <PricingRow label="Delivery Fee" value={order.deliveryFee} />
-                    <View style={styles.totalDivider} />
-                    <View style={styles.totalRow}>
-                        <Text style={styles.totalLabel}>Total Amount</Text>
-                        <Text style={styles.totalValue}>{order.total.toLocaleString()} DA</Text>
+                        <View style={styles.divider} />
+
+                        {/* Invoice Details Section */}
+                        <View style={styles.sectionHeader}>
+                            <Ionicons name="receipt-outline" size={16} color={NAVY} style={{ marginRight: 8 }} />
+                            <Text style={styles.sectionTitle}>INVOICE DETAILS</Text>
+                        </View>
+
+                        <View style={styles.detailsList}>
+                            <DetailRow label="Order ID" value={`#${order.orderId}`} />
+                            <DetailRow label="Customer" value={order.customer.name} />
+                            <DetailRow label="Item" value={order.items[0]?.description || 'N/A'} />
+                            <DetailRow label="Distance" value={order.deliveryAddress.distance || '4.2 km'} />
+                        </View>
+
+                        {/* Earnings Summary Box */}
+                        <View style={styles.earningsBox}>
+                            <View style={styles.earningsRow}>
+                                <Text style={styles.earningsLabel}>Subtotal</Text>
+                                <Text style={styles.earningsValue}>{order.subtotal?.toLocaleString()} DA</Text>
+                            </View>
+                            <View style={styles.earningsRow}>
+                                <Text style={styles.earningsLabel}>Delivery Fee</Text>
+                                <Text style={styles.earningsValue}>{order.deliveryFee?.toLocaleString()} DA</Text>
+                            </View>
+                            
+                            <View style={styles.innerDivider} />
+                            
+                            <View style={styles.totalRow}>
+                                <Text style={styles.totalLabel}>TOTAL EARNINGS</Text>
+                                <Text style={styles.totalValue}>{order.total?.toLocaleString()} DA</Text>
+                            </View>
+                        </View>
+
+                        {/* Big Action Button */}
+                        <TouchableOpacity 
+                            style={styles.backButton} 
+                            onPress={handleBackToDashboard}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={styles.backButtonText}>BACK TO DASHBOARD</Text>
+                            <Ionicons name="arrow-forward" size={20} color={WHITE} />
+                        </TouchableOpacity>
+
                     </View>
-                </View>
-            </ScrollView>
 
-            {/* ── STICKY BOTTOM */}
-            <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-                <TouchableOpacity style={styles.doneBtn} onPress={handleDone} activeOpacity={0.85}>
-                    <Text style={styles.doneBtnText}>Back to Dashboard</Text>
-                    <Ionicons name="home" size={18} color={NAVY} style={{ marginLeft: 8 }} />
-                </TouchableOpacity>
+                    {/* Footer Text */}
+                    <Text style={styles.footerText}>POWERED BY AMMARLI</Text>
+                </ScrollView>
+
             </View>
         </View>
     );
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
-function SectionLabel({ text }: { text: string }) {
-    return <Text style={styles.sectionLabel}>{text}</Text>;
-}
-
-function MetaRow({ label, value, green = false, last = false }: {
-    label: string; value: string; green?: boolean; last?: boolean;
-}) {
+function DetailRow({ label, value }: { label: string, value: string }) {
     return (
-        <View style={[styles.metaRow, !last && { borderBottomWidth: 1, borderBottomColor: BORDER }]}>
-            <Text style={styles.metaLabel}>{label}</Text>
-            <Text style={[styles.metaValue, green && { color: GREEN }]}>{value}</Text>
+        <View style={styles.row}>
+            <Text style={styles.rowLabel}>{label}</Text>
+            <Text style={styles.rowValue} numberOfLines={1}>{value}</Text>
         </View>
     );
 }
 
-function PricingRow({ label, value }: { label: string; value: number }) {
-    return (
-        <View style={styles.pricingRow}>
-            <Text style={styles.pricingLabel}>{label}</Text>
-            <Text style={styles.pricingValue}>{value.toLocaleString()} DA</Text>
-        </View>
-    );
-}
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-    root: { flex: 1, backgroundColor: BG },
-
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: WHITE,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: BORDER,
+    root: {
+        flex: 1,
+        backgroundColor: 'rgba(255,255,255,0.4)',
     },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: NAVY },
-    shareBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-end' },
-
-    scroll: { paddingHorizontal: 16, paddingTop: 20 },
-
-    // ── Success banner
-    successBanner: {
-        backgroundColor: NAVY,
-        borderRadius: 22,
-        paddingVertical: 32,
+    container: {
+        flex: 1,
+        paddingHorizontal: 25,
+    },
+    scroll: {
+        flexGrow: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    mainCard: {
+        backgroundColor: WHITE,
+        borderRadius: 40,
+        width: '100%',
+        padding: 30,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 15 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    headerSection: {
         alignItems: 'center',
         marginBottom: 20,
-        gap: 10,
+    },
+    successIconOuter: {
+        marginBottom: 20,
+        shadowColor: YELLOW,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+        elevation: 8,
     },
     successIconCircle: {
-        width: 80, height: 80,
+        width: 80,
+        height: 80,
         borderRadius: 40,
         backgroundColor: YELLOW,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 4,
     },
-    successTitle: { fontSize: 22, fontWeight: 'bold', color: WHITE },
-    successSub: { fontSize: 14, color: 'rgba(255,255,255,0.65)' },
-
-    // ── Meta card
-    metaCard: {
-        backgroundColor: WHITE,
-        borderRadius: 18,
-        paddingHorizontal: 16,
-        marginBottom: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+    titleText: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: NAVY,
+        textAlign: 'center',
+        lineHeight: 32,
+        marginBottom: 8,
     },
-    metaRow: {
+    subtitleText: {
+        fontSize: 14,
+        color: GRAY,
+        textAlign: 'center',
+        fontWeight: '500',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#F1F5F9',
+        marginVertical: 25,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 15,
+    },
+    sectionTitle: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#475569',
+        letterSpacing: 1.2,
+    },
+    detailsList: {
+        gap: 14,
+        marginBottom: 25,
+    },
+    row: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 14,
     },
-    metaLabel: { fontSize: 13, color: GRAY },
-    metaValue: { fontSize: 14, fontWeight: '600', color: NAVY, flex: 1, textAlign: 'right' },
-
-    // Section label
-    sectionLabel: {
-        fontSize: 11, fontWeight: '800', color: NAVY,
-        letterSpacing: 0.8, marginBottom: 10,
+    rowLabel: {
+        fontSize: 14,
+        color: GRAY,
+        fontWeight: '500',
     },
-
-    // Items card
-    itemsCard: {
-        backgroundColor: WHITE, borderRadius: 16, padding: 16, marginBottom: 14,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    rowValue: {
+        fontSize: 14,
+        color: NAVY,
+        fontWeight: '700',
     },
-    itemRow: { flexDirection: 'row', alignItems: 'center' },
-    itemIconBox: {
-        width: 40, height: 40, borderRadius: 12,
-        backgroundColor: '#F0F4FA', justifyContent: 'center', alignItems: 'center',
+    earningsBox: {
+        backgroundColor: LIGHT_BG,
+        borderRadius: 20,
+        padding: 20,
+        marginBottom: 30,
     },
-    itemDesc: { fontSize: 14, fontWeight: 'bold', color: NAVY },
-    itemDetail: { fontSize: 12, color: GRAY, marginTop: 1 },
-    itemPrice: { fontSize: 15, fontWeight: 'bold', color: NAVY },
-
-    // Pricing card
-    pricingCard: {
-        backgroundColor: WHITE, borderRadius: 16, padding: 18, marginBottom: 20,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    earningsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 10,
     },
-    pricingRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-    pricingLabel: { fontSize: 14, color: GRAY },
-    pricingValue: { fontSize: 14, color: GRAY },
-    totalDivider: { height: 1, backgroundColor: BORDER, marginVertical: 10 },
-    totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    totalLabel: { fontSize: 16, fontWeight: 'bold', color: NAVY },
-    totalValue: { fontSize: 24, fontWeight: 'bold', color: NAVY },
-
-    // Bottom bar
-    bottomBar: {
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        backgroundColor: WHITE, borderTopWidth: 1, borderTopColor: BORDER,
-        paddingHorizontal: 16, paddingTop: 12,
+    earningsLabel: {
+        fontSize: 13,
+        color: GRAY,
+        fontWeight: '500',
     },
-    doneBtn: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: YELLOW, borderRadius: 16, paddingVertical: 16,
-        shadowColor: YELLOW, shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    earningsValue: {
+        fontSize: 13,
+        color: NAVY,
+        fontWeight: 'bold',
     },
-    doneBtnText: { fontSize: 16, fontWeight: 'bold', color: NAVY },
+    innerDivider: {
+        height: 1,
+        backgroundColor: '#E2E8F0',
+        marginVertical: 12,
+    },
+    totalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    totalLabel: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: NAVY,
+    },
+    totalValue: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: NAVY,
+    },
+    backButton: {
+        backgroundColor: NAVY,
+        paddingVertical: 18,
+        borderRadius: 18,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+        shadowColor: NAVY,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 6,
+    },
+    backButtonText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: WHITE,
+        letterSpacing: 0.5,
+    },
+    footerText: {
+        marginTop: 30,
+        fontSize: 10,
+        fontWeight: 'bold',
+        color: 'rgba(71, 85, 105, 0.4)',
+        letterSpacing: 4,
+        textAlign: 'center',
+    },
 });

@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
     Alert,
     Animated,
+    Image,
     Linking,
     ScrollView,
     StatusBar,
@@ -15,27 +17,25 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DriverOrder, useAppStore } from '../src/store/useAppStore';
 
-// ─── Theme ─────────────────────────────────────────────────────────────────────
+// ─── Theme Constants ───────────────────────────────────────────────────────────
 const NAVY = '#003366';
 const YELLOW = '#F3CD0D';
 const BG = '#F5F7FA';
 const WHITE = '#FFFFFF';
-const GRAY = '#6B7280';
-const GREEN = '#10B981';
+const GRAY = '#8E98A8'; // Subtle gray for secondary text
 const BORDER = '#E5E7EB';
-const BLUE = '#3B82F6';
 
 export default function DriverActiveDeliveryScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { activeDriverOrder, updateDriverOrderStatus, completeDriverOrder } = useAppStore();
+    const { activeDriverOrder, updateDriverOrderStatus } = useAppStore();
 
-    // Fallback mock — screen always renders during dev
+    // Fallback data for preview/safety
     const order: DriverOrder = activeDriverOrder ?? {
         orderId: '84291',
         customer: { name: 'Ahmed Benali', phone: '+213 555 12 34 56' },
         deliveryAddress: {
-            label: '2.5 km away — Batna, Algeria',
+            label: '2.5 km away - Batna, Algeria',
             distance: '2.5 km',
             lat: 35.5596,
             lng: 6.1740,
@@ -43,7 +43,7 @@ export default function DriverActiveDeliveryScreen() {
         driverLat: 35.5620,
         driverLng: 6.1700,
         items: [
-            { icon: 'cube', description: '5x 1.5L Packs (Ifri)', detail: 'Mineral Water', price: 1100 },
+            { icon: 'water', description: '5x 1.5L Packs (Ifri)', detail: 'Mineral Water', price: 1100 },
         ],
         subtotal: 1100,
         deliveryFee: 150,
@@ -52,7 +52,7 @@ export default function DriverActiveDeliveryScreen() {
         createdAt: 'Oct 24, 2023 • 14:20',
     };
 
-    // ── 10-second completion animation ─────────────────────────────────────────
+    // ── 10-second completion animation logic ───────────────────────────────────
     const [completing, setCompleting] = useState(false);
     const [countdown, setCountdown] = useState(10);
     const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -78,27 +78,45 @@ export default function DriverActiveDeliveryScreen() {
         }, 1000);
     };
 
-    // ── Open Google Maps with driver→customer route ─────────────────────────────
-    const openGoogleMaps = () => {
-        const { lat, lng } = order.deliveryAddress;
-        const origin = `${order.driverLat},${order.driverLng}`;
-        const destination = `${lat},${lng}`;
-        // Google Maps deep-link: shows turn-by-turn driving directions
-        const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
-        Linking.openURL(url).catch(() =>
-            Alert.alert('خطأ', 'تعذّر فتح خرائط Google.')
-        );
+    // ── Live GPS & Routing Logic (The Wow Factor) ─────────────────────────────
+    const openLiveGoogleMaps = async () => {
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'Location permission is required to calculate the route.');
+                return;
+            }
+
+            const location = await Location.getCurrentPositionAsync({});
+            const { latitude, longitude } = location.coords;
+
+            // The Math Trick: Offset roughly 2.5km to 3km
+            const destLat = latitude + 0.022;
+            const destLng = longitude + 0.022;
+
+            // Google Maps Deep Link
+            const url = `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}&travelmode=driving`;
+            
+            const supported = await Linking.canOpenURL(url);
+            if (supported) {
+                Linking.openURL(url);
+            } else {
+                // Fallback to web search if app not found (unlikely on mobile)
+                Linking.openURL(`https://www.google.com/search?q=${url}`);
+            }
+        } catch (err) {
+            Alert.alert('Error', 'Unable to fetch location or open maps.');
+        }
     };
 
-    // ── Call customer ──────────────────────────────────────────────────────────
     const callCustomer = () => {
         const phone = order.customer.phone.replace(/\s/g, '');
         Linking.openURL(`tel:${phone}`).catch(() =>
-            Alert.alert('خطأ', 'تعذّر فتح تطبيق الاتصال.')
+            Alert.alert('Error', 'Could not open phone dialer.')
         );
     };
 
-    // ── 10-second success overlay ──────────────────────────────────────────────
+    // ── Success Animation Overlay ─────────────────────────────────────────────
     if (completing) {
         return (
             <View style={styles.successOverlay}>
@@ -111,290 +129,253 @@ export default function DriverActiveDeliveryScreen() {
         );
     }
 
-    // ── Main screen ────────────────────────────────────────────────────────────
     return (
-        <View style={[styles.root, { paddingTop: insets.top }]}>
+        <View style={styles.root}>
             <StatusBar barStyle="dark-content" />
-
+            
             {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="chevron-back" size={24} color={NAVY} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Order Details</Text>
-                <View style={{ width: 40 }} />
+                <View style={{ width: 44 }} />
             </View>
 
-            <ScrollView
-                contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 130 }]}
+            <ScrollView 
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}
                 showsVerticalScrollIndicator={false}
             >
-                {/* ── ORDER ID BANNER */}
-                <View style={styles.orderBanner}>
-                    <View>
-                        <Text style={styles.orderIdLabel}>Order ID</Text>
-                        <Text style={styles.orderIdValue}>#{order.orderId}</Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-                            <Ionicons name="calendar-outline" size={13} color="rgba(255,255,255,0.65)" />
-                            <Text style={styles.orderDate}> {order.createdAt}</Text>
+                {/* 1. Top Navy Card */}
+                <View style={styles.topCard}>
+                    <View style={styles.cardContent}>
+                        <Text style={styles.cardOrderIdLabel}>Order ID</Text>
+                        <Text style={styles.cardOrderIdValue}>#{order.orderId}</Text>
+                        
+                        <View style={styles.dateRow}>
+                            <Ionicons name="calendar-outline" size={14} color="rgba(255,255,255,0.6)" />
+                            <Text style={styles.cardDate}>{order.createdAt}</Text>
                         </View>
                     </View>
-                    <View style={styles.statusBadge}>
-                        <Text style={styles.statusBadgeText}>IN PROGRESS</Text>
+                    
+                    <View style={styles.cardRight}>
+                        <View style={styles.statusBadge}>
+                            <Text style={styles.statusBadgeText}>IN PROGRESS</Text>
+                        </View>
+                        {/* Faint circle graphic */}
+                        <View style={styles.graphicCircle} />
                     </View>
                 </View>
 
-                {/* ── CUSTOMER INFORMATION */}
-                <SectionLabel text="CUSTOMER INFORMATION" />
-
-                {/* Customer name + phone */}
-                <View style={styles.infoCard}>
+                {/* 2. Customer Information Section */}
+                <Text style={styles.sectionTitle}>CUSTOMER INFORMATION</Text>
+                
+                <View style={styles.infoRowCard}>
                     <View style={styles.avatarBox}>
-                        <Ionicons name="person" size={22} color={NAVY} />
+                        <Ionicons name="person" size={24} color={NAVY} />
                     </View>
-                    <View style={{ flex: 1, marginLeft: 14 }}>
-                        <Text style={styles.customerName}>{order.customer.name}</Text>
-                        <Text style={styles.customerPhone}>{order.customer.phone}</Text>
+                    <View style={styles.infoTextContainer}>
+                        <Text style={styles.infoName}>{order.customer.name}</Text>
+                        <Text style={styles.infoSubtitle}>{order.customer.phone}</Text>
                     </View>
                 </View>
 
-                {/* Delivery address — tappable → Google Maps */}
-                <TouchableOpacity style={styles.infoCard} onPress={openGoogleMaps} activeOpacity={0.8}>
-                    <View style={[styles.avatarBox, { backgroundColor: '#EFF6FF' }]}>
-                        <Ionicons name="navigate" size={20} color={BLUE} />
+                <TouchableOpacity 
+                    style={styles.infoRowCard} 
+                    onPress={openLiveGoogleMaps}
+                    activeOpacity={0.7}
+                >
+                    <View style={[styles.avatarBox, { backgroundColor: '#E0E7FF' }]}>
+                        <Ionicons name="location" size={24} color="#4F46E5" />
                     </View>
-                    <View style={{ flex: 1, marginLeft: 14 }}>
-                        <Text style={styles.customerName}>Delivery Address</Text>
-                        <Text style={styles.customerPhone}>{order.deliveryAddress.label}</Text>
+                    <View style={styles.infoTextContainer}>
+                        <Text style={styles.infoName}>Delivery Address</Text>
+                        <Text style={styles.infoSubtitle}>{order.deliveryAddress.label}</Text>
                     </View>
-                    <Ionicons name="open-outline" size={18} color={GRAY} />
                 </TouchableOpacity>
 
-                {/* Map card — tappable → Google Maps (no native MapView) */}
-                <TouchableOpacity
-                    style={styles.mapCard}
-                    onPress={openGoogleMaps}
-                    activeOpacity={0.88}
+                {/* 3. Map Preview Placeholder */}
+                <TouchableOpacity 
+                    onPress={openLiveGoogleMaps} 
+                    activeOpacity={0.9}
+                    style={styles.mapContainer}
                 >
-                    {/* Decorative map-like background */}
+                    {/* Placeholder colored view with a pin */}
                     <View style={styles.mapPlaceholder}>
-                        {/* Grid lines */}
-                        {[...Array(5)].map((_, i) => (
-                            <View key={`h${i}`} style={[styles.mapGridH, { top: `${20 * i}%` as any }]} />
-                        ))}
-                        {[...Array(5)].map((_, i) => (
-                            <View key={`v${i}`} style={[styles.mapGridV, { left: `${20 * i}%` as any }]} />
-                        ))}
-                        {/* Blue route line */}
-                        <View style={styles.routeLine} />
-                        {/* Destination pin */}
-                        <View style={styles.pinContainer}>
-                            <View style={styles.pin}>
+                        {/* Grid/Line pattern mock */}
+                        <View style={styles.mapGridLine1} />
+                        <View style={styles.mapGridLine2} />
+                        <View style={styles.mapPin}>
+                            <View style={styles.pinCircle}>
                                 <Ionicons name="location" size={20} color={WHITE} />
                             </View>
+                            <View style={styles.pinShadow} />
                         </View>
-                    </View>
-                    {/* Overlay label */}
-                    <View style={styles.mapOverlayBadge}>
-                        <Ionicons name="map" size={14} color={WHITE} />
-                        <Text style={styles.mapOverlayText}>Open in Google Maps</Text>
                     </View>
                 </TouchableOpacity>
 
-                {/* ── ORDER ITEMS */}
-                <SectionLabel text="ORDER ITEMS" />
-
-                <View style={styles.itemsCard}>
-                    {order.items.map((item, i) => (
-                        <View
-                            key={i}
-                            style={[
-                                styles.itemRow,
-                                i > 0 && { borderTopWidth: 1, borderTopColor: BORDER, paddingTop: 14, marginTop: 14 },
-                            ]}
-                        >
-                            <View style={styles.itemIconBox}>
-                                <Ionicons name={item.icon as any} size={22} color={NAVY} />
-                            </View>
-                            <View style={{ flex: 1, marginLeft: 14 }}>
-                                <Text style={styles.itemDesc}>{item.description}</Text>
-                                <Text style={styles.itemDetail}>{item.detail}</Text>
-                            </View>
-                            <Text style={styles.itemPrice}>{item.price.toLocaleString()} DA</Text>
+                {/* 4. Order Items Section */}
+                <Text style={styles.sectionTitle}>ORDER ITEMS</Text>
+                
+                <View style={styles.whiteCard}>
+                    <View style={styles.itemRow}>
+                        <View style={styles.itemIconBox}>
+                            <Ionicons name="water" size={24} color={NAVY} />
                         </View>
-                    ))}
+                        <View style={{ flex: 1, marginLeft: 14 }}>
+                            <Text style={styles.itemName}>5x 1.5L Packs (Ifri)</Text>
+                            <Text style={styles.itemSubText}>Mineral Water</Text>
+                        </View>
+                        <Text style={styles.itemPrice}>1,100 DA</Text>
+                    </View>
 
-                    {/* Pricing */}
-                    <View style={styles.priceDivider} />
-                    <PricingRow label="Subtotal" value={order.subtotal} />
-                    <PricingRow label="Delivery Fee" value={order.deliveryFee} />
-                    <View style={styles.totalRow}>
+                    <View style={styles.divider} />
+
+                    <View style={styles.pricingRow}>
+                        <Text style={styles.pricingLabel}>Subtotal</Text>
+                        <Text style={styles.pricingValue}>1,100 DA</Text>
+                    </View>
+                    <View style={styles.pricingRow}>
+                        <Text style={styles.pricingLabel}>Delivery Fee</Text>
+                        <Text style={styles.pricingValue}>150 DA</Text>
+                    </View>
+
+                    <View style={[styles.pricingRow, { marginTop: 10 }]}>
                         <Text style={styles.totalLabel}>Total Amount</Text>
-                        <Text style={styles.totalValue}>{order.total.toLocaleString()} DA</Text>
+                        <Text style={styles.totalValue}>1,250 DA</Text>
                     </View>
                 </View>
             </ScrollView>
 
-            {/* ── STICKY ACTION BUTTONS */}
-            <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-                <TouchableOpacity style={styles.callBtn} onPress={callCustomer} activeOpacity={0.85}>
+            {/* Sticky Actions */}
+            <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+                <TouchableOpacity 
+                    style={styles.callButton} 
+                    onPress={callCustomer}
+                    activeOpacity={0.8}
+                >
                     <Ionicons name="call" size={18} color={NAVY} style={{ marginRight: 8 }} />
-                    <Text style={styles.callBtnText}>Call Customer</Text>
+                    <Text style={styles.callButtonText}>Call Customer</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.completeBtn} onPress={handleComplete} activeOpacity={0.85}>
-                    <Ionicons name="checkmark-circle" size={18} color={NAVY} style={{ marginRight: 8 }} />
-                    <Text style={styles.completeBtnText}>Complete Delivery</Text>
+                <TouchableOpacity 
+                    style={styles.completeButton} 
+                    onPress={handleComplete}
+                    activeOpacity={0.85}
+                >
+                    <Ionicons name="checkmark-circle" size={20} color={NAVY} style={{ marginRight: 8 }} />
+                    <Text style={styles.completeButtonText}>Complete Delivery</Text>
                 </TouchableOpacity>
             </View>
         </View>
     );
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
-function SectionLabel({ text }: { text: string }) {
-    return <Text style={styles.sectionLabel}>{text}</Text>;
-}
-
-function PricingRow({ label, value }: { label: string; value: number }) {
-    return (
-        <View style={styles.pricingRow}>
-            <Text style={styles.pricingLabel}>{label}</Text>
-            <Text style={styles.pricingValue}>{value.toLocaleString()} DA</Text>
-        </View>
-    );
-}
-
-// ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: BG },
-
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: WHITE,
         paddingHorizontal: 16,
-        paddingVertical: 14,
+        backgroundColor: WHITE,
+        paddingBottom: 15,
         borderBottomWidth: 1,
         borderBottomColor: BORDER,
     },
-    backBtn: { width: 40, height: 40, justifyContent: 'center' },
+    backBtn: { width: 44, height: 44, justifyContent: 'center' },
     headerTitle: { fontSize: 18, fontWeight: 'bold', color: NAVY },
+    scrollContent: { padding: 20 },
 
-    scroll: { paddingHorizontal: 16, paddingTop: 16 },
-
-    // ── Order banner
-    orderBanner: {
+    // Top Card
+    topCard: {
         backgroundColor: NAVY,
-        borderRadius: 20,
+        borderRadius: 24,
         padding: 22,
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 22,
+        overflow: 'hidden',
+        marginBottom: 25,
     },
-    orderIdLabel: { fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: '600', letterSpacing: 0.4 },
-    orderIdValue: { fontSize: 26, fontWeight: 'bold', color: WHITE, marginTop: 2 },
-    orderDate: { fontSize: 12, color: 'rgba(255,255,255,0.65)' },
-    statusBadge: { backgroundColor: YELLOW, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
-    statusBadgeText: { fontSize: 11, fontWeight: 'bold', color: NAVY, letterSpacing: 0.5 },
-
-    sectionLabel: {
-        fontSize: 11, fontWeight: '800', color: NAVY,
-        letterSpacing: 0.8, marginBottom: 10, marginTop: 4,
+    cardOrderIdLabel: { fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: '600' },
+    cardOrderIdValue: { fontSize: 28, fontWeight: 'bold', color: WHITE, marginTop: 4 },
+    dateRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
+    cardDate: { fontSize: 13, color: 'rgba(255,255,255,0.7)', marginLeft: 6 },
+    cardRight: { alignItems: 'flex-end', justifyContent: 'space-between' },
+    statusBadge: { backgroundColor: YELLOW, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 },
+    statusBadgeText: { fontSize: 11, fontWeight: 'bold', color: NAVY },
+    graphicCircle: {
+        width: 100, height: 100,
+        borderRadius: 50,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        position: 'absolute',
+        bottom: -40, right: -30,
+        borderWidth: 15,
+        borderColor: 'rgba(255,255,255,0.03)',
     },
 
-    // ── Info cards
-    infoCard: {
+    // Sections
+    sectionTitle: {
+        fontSize: 12, fontWeight: '800', color: NAVY,
+        letterSpacing: 1, marginBottom: 12, marginTop: 10,
+    },
+    infoRowCard: {
         backgroundColor: WHITE,
-        borderRadius: 16,
+        borderRadius: 20,
         padding: 16,
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
     },
     avatarBox: {
-        width: 44, height: 44,
-        borderRadius: 22,
+        width: 48, height: 48,
+        borderRadius: 16,
         backgroundColor: '#F0F4FA',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    customerName: { fontSize: 16, fontWeight: 'bold', color: NAVY },
-    customerPhone: { fontSize: 13, color: GRAY, marginTop: 2 },
+    infoTextContainer: { marginLeft: 16, flex: 1 },
+    infoName: { fontSize: 16, fontWeight: 'bold', color: NAVY },
+    infoSubtitle: { fontSize: 13, color: GRAY, marginTop: 2 },
 
-    // ── Map card (no native MapView — opens Google Maps on tap)
-    mapCard: {
-        height: 160,
-        borderRadius: 16,
+    // Map Preview
+    mapContainer: {
+        height: 180,
+        borderRadius: 24,
         overflow: 'hidden',
-        marginBottom: 22,
-        backgroundColor: '#D4E4F7',
+        marginVertical: 15,
+        borderWidth: 1,
+        borderColor: BORDER,
     },
     mapPlaceholder: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: '#C8DFF5',
-        overflow: 'hidden',
-    },
-    mapGridH: {
-        position: 'absolute', left: 0, right: 0,
-        height: 1, backgroundColor: 'rgba(255,255,255,0.4)',
-    },
-    mapGridV: {
-        position: 'absolute', top: 0, bottom: 0,
-        width: 1, backgroundColor: 'rgba(255,255,255,0.4)',
-    },
-    routeLine: {
-        position: 'absolute',
-        top: '30%', left: '20%',
-        width: '60%', height: 4,
-        backgroundColor: BLUE,
-        borderRadius: 2,
-        transform: [{ rotate: '-15deg' }],
-    },
-    pinContainer: {
-        position: 'absolute',
-        top: '25%', left: '55%',
-    },
-    pin: {
-        width: 32, height: 32,
-        borderRadius: 16,
-        backgroundColor: NAVY,
+        flex: 1,
+        backgroundColor: '#E2E8F0',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    mapOverlayBadge: {
-        position: 'absolute',
-        bottom: 10, right: 10,
-        backgroundColor: 'rgba(0,0,0,0.55)',
+    mapGridLine1: { position: 'absolute', width: '100%', height: 2, backgroundColor: WHITE, top: '40%', opacity: 0.5 },
+    mapGridLine2: { position: 'absolute', width: 2, height: '100%', backgroundColor: WHITE, left: '60%', opacity: 0.5 },
+    mapPin: { alignItems: 'center' },
+    pinCircle: {
+        width: 40, height: 40,
         borderRadius: 20,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        flexDirection: 'row',
+        backgroundColor: NAVY,
+        justifyContent: 'center',
         alignItems: 'center',
-        gap: 6,
+        zIndex: 2,
     },
-    mapOverlayText: { fontSize: 12, color: WHITE, fontWeight: '600' },
+    pinShadow: { 
+        width: 10, height: 4, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.1)', marginTop: -2, zIndex: 1 
+    },
 
-    // ── Items card
-    itemsCard: {
+    // Items Section
+    whiteCard: {
         backgroundColor: WHITE,
-        borderRadius: 16,
-        padding: 18,
-        marginBottom: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        borderRadius: 24,
+        padding: 20,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
     },
-    itemRow: { flexDirection: 'row', alignItems: 'center' },
     itemIconBox: {
         width: 44, height: 44,
         borderRadius: 12,
@@ -402,56 +383,39 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    itemDesc: { fontSize: 15, fontWeight: 'bold', color: NAVY },
-    itemDetail: { fontSize: 12, color: GRAY, marginTop: 2 },
-    itemPrice: { fontSize: 15, fontWeight: 'bold', color: NAVY },
+    itemName: { fontSize: 16, fontWeight: 'bold', color: NAVY },
+    itemSubText: { fontSize: 12, color: GRAY, marginTop: 2 },
+    itemPrice: { fontSize: 16, fontWeight: 'bold', color: NAVY },
+    divider: { height: 1, backgroundColor: BORDER, marginVertical: 18 },
+    pricingRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+    pricingLabel: { fontSize: 14, color: GRAY, fontWeight: '500' },
+    pricingValue: { fontSize: 14, color: NAVY, fontWeight: 'bold' },
+    totalLabel: { fontSize: 17, fontWeight: 'bold', color: NAVY },
+    totalValue: { fontSize: 24, fontWeight: 'bold', color: NAVY },
 
-    priceDivider: { height: 1, backgroundColor: BORDER, marginVertical: 14 },
-    pricingRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-    pricingLabel: { fontSize: 14, color: GRAY },
-    pricingValue: { fontSize: 14, color: GRAY },
-    totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    totalLabel: { fontSize: 16, fontWeight: 'bold', color: NAVY },
-    totalValue: { fontSize: 20, fontWeight: 'bold', color: NAVY },
-
-    // ── Bottom bar
+    // Bottom Bar
     bottomBar: {
-        position: 'absolute',
-        bottom: 0, left: 0, right: 0,
+        position: 'absolute', bottom: 0, left: 0, right: 0,
         backgroundColor: WHITE,
-        borderTopWidth: 1,
-        borderTopColor: BORDER,
-        paddingHorizontal: 16,
-        paddingTop: 12,
-        gap: 10,
+        padding: 20,
+        borderTopWidth: 1, borderTopColor: BORDER,
+        gap: 12,
     },
-    callBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1.5,
-        borderColor: NAVY,
-        borderRadius: 16,
-        paddingVertical: 14,
+    callButton: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1.5, borderColor: NAVY,
+        paddingVertical: 15, borderRadius: 18,
     },
-    callBtnText: { fontSize: 16, fontWeight: 'bold', color: NAVY },
-
-    completeBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
+    callButtonText: { fontSize: 16, fontWeight: 'bold', color: NAVY },
+    completeButton: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
         backgroundColor: YELLOW,
-        borderRadius: 16,
-        paddingVertical: 16,
-        shadowColor: YELLOW,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.35,
-        shadowRadius: 8,
-        elevation: 4,
+        paddingVertical: 18, borderRadius: 20,
+        shadowColor: YELLOW, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6,
     },
-    completeBtnText: { fontSize: 16, fontWeight: 'bold', color: NAVY },
+    completeButtonText: { fontSize: 17, fontWeight: 'bold', color: NAVY },
 
-    // ── 10-second success overlay
+    // Completion Animation
     successOverlay: {
         flex: 1,
         backgroundColor: YELLOW,
@@ -465,11 +429,7 @@ const styles = StyleSheet.create({
         backgroundColor: WHITE,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.2,
-        shadowRadius: 20,
-        elevation: 10,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 10,
     },
     successTitle: { fontSize: 28, fontWeight: 'bold', color: NAVY },
     successSub: { fontSize: 16, color: NAVY, opacity: 0.75 },

@@ -13,36 +13,50 @@ export default function RootLayout() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const hasLaunched = await AsyncStorage.getItem('hasLaunched');
+      try {
+        console.log('[RootLayout] Checking session...');
+        const hasLaunched = await AsyncStorage.getItem('hasLaunched');
+        console.log('[RootLayout] hasLaunched:', hasLaunched);
 
-      if (!hasLaunched) {
-        setTimeout(() => {
-          router.replace('/onboarding');
-        }, 100);
-        setLoading(false);
-        return;
-      }
+        if (!hasLaunched) {
+          console.log('[RootLayout] First launch, redirecting to onboarding');
+          setTimeout(() => {
+            router.replace('/onboarding');
+          }, 100);
+          setLoading(false);
+          return;
+        }
 
-      const session = await getUserSession();
-      if (session) {
-        // User logged in mسبقاً, wait for layout to mount then redirect to success/main
-        // Using setTimeout to ensure navigation happens after layout mounts
-        setTimeout(async () => {
-          try {
-            let { status } = await Location.getForegroundPermissionsAsync();
-            let providerStatus = await Location.getProviderStatusAsync();
+        const session = await getUserSession();
+        console.log('[RootLayout] Session found:', session);
+        
+        if (session) {
+          setTimeout(async () => {
+            try {
+              console.log('[RootLayout] Checking GPS permissions...');
+              let { status } = await Location.getForegroundPermissionsAsync();
+              let providerStatus = await Location.getProviderStatusAsync();
+              console.log('[RootLayout] GPS Status:', status, 'Enabled:', providerStatus.locationServicesEnabled);
 
-            if (status === 'granted' && providerStatus.locationServicesEnabled) {
-              router.replace('/(tabs)');
-            } else {
+              if (status === 'granted' && providerStatus.locationServicesEnabled) {
+                router.replace('/(tabs)');
+              } else {
+                router.replace('/gps');
+              }
+            } catch (err) {
+              console.log('[RootLayout] GPS check error:', err);
               router.replace('/gps');
             }
-          } catch {
-            router.replace('/gps');
-          }
-        }, 100);
+          }, 100);
+        } else {
+          console.log('[RootLayout] No session, staying on index/auth');
+        }
+      } catch (err) {
+        console.error('[RootLayout] checkSession error:', err);
+      } finally {
+        console.log('[RootLayout] Setting loading to false');
+        setLoading(false);
       }
-      setLoading(false);
     };
     checkSession();
   }, [router]);
@@ -60,11 +74,28 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="onboarding" />
+        <Stack.Screen name="role-selection" />
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
         <Stack.Screen name="success" />
         <Stack.Screen name="gps" options={{ animation: 'fade' }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen 
+          name="driver-order-review" 
+          options={{ 
+            presentation: 'transparentModal',
+            animation: 'fade',
+            headerShown: false
+          }} 
+        />
+        <Stack.Screen 
+          name="driver-invoice" 
+          options={{ 
+            presentation: 'transparentModal',
+            animation: 'fade',
+            headerShown: false
+          }} 
+        />
       </Stack>
     </ThemeProvider>
   );
