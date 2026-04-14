@@ -2,11 +2,12 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Dimensions, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Dimensions, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, NativeModules } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppStore } from '../../src/store/useAppStore';
 import { useTheme } from '../../src/theme/ThemeContext';
 import { clearUserSession } from '../../src/utils/storage';
+import { changeLanguage } from '../../src/localization/i18n';
 
 const { width } = Dimensions.get('window');
 
@@ -16,34 +17,64 @@ export default function ProfileScreen() {
     const styles = getStyles(COLORS);
 
     const router = useRouter();
-    const insets = useSafeAreaInsets();
-    const paddingTopWithSafeArea = Math.max(insets.top + 20, 60);
     const { t } = useTranslation();
 
     const [isLogoutModalVisible, setLogoutModalVisible] = useState(false);
+    const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
+
+    const logout = useAppStore(s => s.logout);
+    const language = useAppStore(s => s.language);
+    const setLanguage = useAppStore(s => s.setLanguage);
+
+    const handleLanguageSelect = async (lang: 'en' | 'ar') => {
+        setLanguageModalVisible(false);
+        if (lang === language) return;
+
+        setLanguage(lang);
+        const needsReload = await changeLanguage(lang);
+
+        if (needsReload) {
+            Alert.alert(
+                t('Settings'),
+                t('App layout needs to be refreshed to fully apply the Arabic shift. The app will now reload.'),
+                [
+                    { 
+                        text: t('OK'), 
+                        onPress: () => {
+                            if (__DEV__ && NativeModules.DevSettings) {
+                                NativeModules.DevSettings.reload();
+                            }
+                        } 
+                    }
+                ]
+            );
+        }
+    };
 
     const handleSignOut = async () => {
-        await clearUserSession();
         setLogoutModalVisible(false);
+        // Navigate FIRST before wiping state — prevents null reads during transition
         router.replace('/login');
+        await clearUserSession();
+        logout();
     };
 
     return (
-        <>
+        <SafeAreaView style={styles.container}>
             <ScrollView
-                style={styles.container}
+                style={{ flex: 1 }}
                 contentContainerStyle={[
                     styles.scrollContent,
-                    { paddingTop: paddingTopWithSafeArea }
+                    { paddingTop: 20 },
                 ]}
             >
                 {/* Header Section */}
                 <View style={styles.headerSection}>
                     <View style={styles.headerLeft}>
                         <Text style={styles.userName}>{useAppStore((state) => state.userProfile?.name || 'Guest')}</Text>
-                        <View style={styles.ratingBadge}>
-                            <Text style={styles.ratingText}>{useAppStore((state) => state.user.rating)} </Text>
-                            <Ionicons name="star" size={14} color="#000" />
+                    <View style={styles.ratingBadge}>
+                        <Text style={styles.ratingText}>{useAppStore((state) => state.user?.rating ?? 4.8)} </Text>
+                        <Ionicons name="star" size={14} color="#000" />
                         </View>
                     </View>
                     <View style={styles.avatarContainer}>
@@ -76,14 +107,22 @@ export default function ProfileScreen() {
                 <View style={styles.menuContainer}>
                     <MenuItem
                         iconFamily="MaterialCommunityIcons"
-                        iconName="account-cog"
-                        title={t('Manage Account')}
-                        onPress={() => router.push('/edit-profile')}
+                        iconName="account-edit"
+                        title={t('Edit Profile')}
+                        onPress={() => {
+                            router.push('/edit-profile');
+                        }}
                     />
                     <MenuItem
                         iconFamily="Ionicons"
                         iconName="card"
                         title={t('Payment Methods')}
+                    />
+                    <MenuItem
+                        iconFamily="Ionicons"
+                        iconName="language"
+                        title={t('Language')}
+                        onPress={() => setLanguageModalVisible(true)}
                     />
                     <MenuItem
                         iconFamily="Ionicons"
@@ -142,7 +181,35 @@ export default function ProfileScreen() {
                     </View>
                 </View>
             </Modal>
-        </>
+
+            {/* Language Selection Modal */}
+            <Modal
+                transparent={true}
+                animationType="fade"
+                visible={isLanguageModalVisible}
+                onRequestClose={() => setLanguageModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContainer, { padding: 20 }]}>
+                        <Text style={[styles.modalTitle, { fontSize: 20, marginBottom: 20 }]}>{t('Select Language')}</Text>
+                        
+                        <TouchableOpacity style={styles.langOption} onPress={() => handleLanguageSelect('en')}>
+                            <Text style={styles.langText}>English</Text>
+                            {language === 'en' && <Ionicons name="checkmark-circle" size={24} color={COLORS.accent} />}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.langOption} onPress={() => handleLanguageSelect('ar')}>
+                            <Text style={styles.langText}>العربية</Text>
+                            {language === 'ar' && <Ionicons name="checkmark-circle" size={24} color={COLORS.accent} />}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={[styles.secondaryButton, { marginTop: 15 }]} onPress={() => setLanguageModalVisible(false)}>
+                            <Text style={styles.secondaryButtonText}>{t('Cancel')}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+        </SafeAreaView>
     );
 }
 
@@ -349,5 +416,20 @@ const getStyles = (COLORS: any) => StyleSheet.create({
         color: COLORS.textPrimary,
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    langOption: {
+        flexDirection: 'row',
+        width: '100%',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border || '#f0f0f0',
+    },
+    langText: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: COLORS.textPrimary,
     }
 });

@@ -4,10 +4,10 @@ import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Keyboard, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { MapView, PROVIDER_GOOGLE } from '../components/MapComponent';
+import { MapView, UrlTile } from '../components/MapComponent';
+import { useAppStore } from '../src/store/useAppStore';
 
 const COLORS = {
     navy: '#003366',
@@ -22,16 +22,18 @@ const COLORS = {
 export default function MapPickerScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const mapRef = useRef<any>(null);
+    const mapRef = useRef<MapView>(null);
     const { t } = useTranslation();
     const params = useLocalSearchParams();
     // Which screen to return to after confirming a location (defaults to tank-details for backward compat)
     const returnTo = (params.returnTo as string) || '/tank-details';
 
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
-    const [region, setRegion] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const [region, setRegion] = useState<any>(null); // Null until GPS loads
+    const [loading, setLoading] = useState(true); // Default to loading
     const [isDragging, setIsDragging] = useState(false);
+
+    const { updateDraftOrder } = useAppStore();
 
     // Geocoding States
     const [addressText, setAddressText] = useState(t('Locating...'));
@@ -43,48 +45,66 @@ export default function MapPickerScreen() {
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const searchTimeout = useRef<number | null>(null);
 
-    // Mock Recent Locations
-    const recentLocations = [
-        { id: 1, name: 'Farm - Route de Biskra', address: 'Batna', lat: '35.5558', lon: '6.1741' },
-        { id: 2, name: 'Home - Bouzouran', address: 'Batna', lat: '35.5682', lon: '6.1668' },
-    ];
+
 
     useEffect(() => {
-        (async () => {
-            try {
-                let { status } = await Location.requestForegroundPermissionsAsync();
-                if (status !== 'granted') {
-                    setLoading(false);
-                    return;
-                }
+      let isMounted = true;
+      (async () => {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          alert('يجب تفعيل الـ GPS لتحديد موقعك بدقة');
+          return;
+        }
 
-                let currentLocation = await Location.getCurrentPositionAsync({});
-                setLocation(currentLocation);
-                setRegion({
-                    latitude: currentLocation.coords.latitude,
-                    longitude: currentLocation.coords.longitude,
-                    latitudeDelta: 0.005,
-                    longitudeDelta: 0.005,
-                });
-            } catch (error) {
-                console.warn(error);
-            } finally {
-                setLoading(false);
-            }
-        })();
+        let loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        
+        const exactUserLocation = {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          latitudeDelta: 0.005, // Zoomed in completely to street level
+          longitudeDelta: 0.005,
+        };
+
+        if (isMounted) {
+          // Fly the camera to the exact GPS location
+          mapRef.current?.animateToRegion(exactUserLocation, 1000);
+          setRegion(exactUserLocation);
+          fetchAddress(exactUserLocation.latitude, exactUserLocation.longitude);
+          setLoading(false);
+        }
+      })();
+      return () => { isMounted = false; };
     }, []);
 
     const handleRecenter = async () => {
-        if (!location || !mapRef.current) return;
-        const newRegion = {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-            latitudeDelta: 0.005,
-            longitudeDelta: 0.005,
-        };
-        mapRef.current.animateToRegion(newRegion, 500);
-        setRegion(newRegion);
-        fetchAddress(newRegion.latitude, newRegion.longitude);
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') return;
+
+            let currentLocation;
+            try {
+                currentLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+            } catch (err) {
+                console.warn('GPS recenter failed, using fallback');
+                currentLocation = {
+                    coords: { latitude: 36.7538, longitude: 3.0588 }
+                };
+            }
+
+            const newRegion = {
+                latitude: currentLocation.coords.latitude,
+                longitude: currentLocation.coords.longitude,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+            };
+
+            mapRef.current?.animateToRegion(newRegion, 600);
+            setRegion(newRegion);
+            setLocation(currentLocation as any);
+            fetchAddress(newRegion.latitude, newRegion.longitude);
+        } catch (error) {
+            console.warn('Recenter error:', error);
+        }
     };
 
     const fetchAddress = async (lat: number, lng: number) => {
@@ -99,9 +119,24 @@ export default function MapPickerScreen() {
                     .filter(Boolean)
                     .join(', ');
 
-                setAddressText(formatAddress || t('Unmapped Location'));
+                const finalAddress = formatAddress || t('Unmapped Location');
+                setAddressText(finalAddress);
+                updateDraftOrder({
+                    location: {
+                        latitude: lat,
+                        longitude: lng,
+                        address: finalAddress,
+                    }
+                });
             } else {
                 setAddressText(t('Unknown Location'));
+                updateDraftOrder({
+                    location: {
+                        latitude: lat,
+                        longitude: lng,
+                        address: t('Unknown Location'),
+                    }
+                });
             }
         } catch (error) {
             console.warn(error);
@@ -166,67 +201,27 @@ export default function MapPickerScreen() {
 
     const handleConfirm = () => {
         if (region && addressText) {
-            router.push({
-                pathname: returnTo as any,
-                params: {
-                    lockedLat: region.latitude,
-                    lockedLng: region.longitude,
-                    lockedAddress: addressText,
+            updateDraftOrder({
+                location: {
+                    latitude: region.latitude,
+                    longitude: region.longitude,
+                    address: addressText,
                 }
             });
+            router.back();
         } else {
             router.back();
         }
     };
 
-    if (loading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={COLORS.yellow} />
-            </View>
-        );
-    }
-
     return (
-        <View style={styles.container}>
-            {/* Full Screen Map */}
-            <MapView
-                ref={mapRef}
-                style={StyleSheet.absoluteFillObject}
-                provider={PROVIDER_GOOGLE}
-                initialRegion={region || {
-                    latitude: 25.2048,
-                    longitude: 55.2708,
-                    latitudeDelta: 0.005,
-                    longitudeDelta: 0.005,
-                }}
-                showsUserLocation={true}
-                showsMyLocationButton={false}
-                onRegionChange={() => setIsDragging(true)}
-                onRegionChangeComplete={(newRegion: any) => {
-                    setIsDragging(false);
-                    setRegion(newRegion);
-                    fetchAddress(newRegion.latitude, newRegion.longitude);
-                }}
-            />
-
-            {/* Static Floating Center Pin */}
-            <View style={styles.centerPinContainer} pointerEvents="none">
-                <View style={[styles.centerPin, isDragging && styles.centerPinDragging]}>
-                    <Ionicons name="location" size={40} color={COLORS.navy} style={styles.pinIcon} />
-                    {/* The yellow dot inside */}
-                    <View style={styles.pinDot} />
-                </View>
-                {!isDragging && <View style={styles.pinShadow} />}
-            </View>
-
-            {/* Top Search Bar (Trigger) */}
+        <KeyboardAvoidingView
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+            {/* Top Search Bar with Inline Dropdown */}
             <View style={[styles.topOverlay, { paddingTop: Math.max(insets.top, 20) }]}>
-                <TouchableOpacity
-                    style={styles.searchBar}
-                    activeOpacity={0.9}
-                    onPress={() => setIsSearchActive(true)}
-                >
+                <View style={styles.searchBar}>
                     <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
                         <Ionicons name="arrow-back" size={24} color={COLORS.navy} />
                     </TouchableOpacity>
@@ -234,19 +229,105 @@ export default function MapPickerScreen() {
                         style={styles.searchInput}
                         placeholder={t('Search neighborhood or street...')}
                         placeholderTextColor={COLORS.textGray}
-                        editable={false}
-                        pointerEvents="none"
+                        value={searchText}
+                        onChangeText={onSearchChange}
+                        onFocus={() => setIsSearchActive(true)}
+                        onBlur={() => setTimeout(() => setIsSearchActive(false), 200)}
                     />
-                    <TouchableOpacity style={styles.searchIcon}>
-                        <Ionicons name="search" size={24} color={COLORS.navy} />
-                    </TouchableOpacity>
-                </TouchableOpacity>
+                    {searchText.length > 0 ? (
+                        <TouchableOpacity onPress={() => { setSearchText(''); setSearchResults([]); setIsSearchActive(false); }} style={styles.searchIcon}>
+                            <Ionicons name="close-circle" size={20} color={COLORS.iconGray} />
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity style={styles.searchIcon}>
+                            <Ionicons name="search" size={24} color={COLORS.navy} />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Inline Dropdown */}
+                {isSearchActive && (searchResults.length > 0 || isFetchingAddress) && (
+                    <View style={[styles.searchResultsContainer, { marginTop: 10 }]}>
+                        {isFetchingAddress && searchResults.length === 0 ? (
+                            <View style={[styles.searchResultItem, { justifyContent: 'center', paddingVertical: 20 }]}>
+                                <ActivityIndicator size="small" color={COLORS.navy} />
+                            </View>
+                        ) : (
+                            searchResults.map((result, index) => (
+                                <React.Fragment key={index}>
+                                    <TouchableOpacity
+                                        style={styles.searchResultItem}
+                                        onPress={() => handleSelectResult(result.lat, result.lon)}
+                                    >
+                                        <View style={styles.resultIconBgPin}>
+                                            <Ionicons name="location" size={20} color={COLORS.textGray} />
+                                        </View>
+                                        <View style={styles.resultTextContainer}>
+                                            <Text style={styles.resultTextNormal} numberOfLines={2}>
+                                                {result.display_name}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                    {index < searchResults.length - 1 && <View style={styles.resultDivider} />}
+                                </React.Fragment>
+                            ))
+                        )}
+                    </View>
+                )}
             </View>
 
-            {/* GPS FAB */}
-            <TouchableOpacity style={styles.gpsFab} onPress={handleRecenter}>
-                <MaterialCommunityIcons name="crosshairs-gps" size={24} color={COLORS.navy} />
-            </TouchableOpacity>
+            <View style={styles.mapContainer}>
+                {region ? (
+                    <MapView
+                        ref={mapRef}
+                        style={StyleSheet.absoluteFillObject}
+                        mapType="none"
+                        initialRegion={region}
+                    showsUserLocation={true}
+                    showsMyLocationButton={true}
+                    onRegionChange={() => setIsDragging(true)}
+                    onRegionChangeComplete={(newRegion: any) => {
+                        setIsDragging(false);
+                        setRegion(newRegion);
+                        fetchAddress(newRegion.latitude, newRegion.longitude);
+                    }}
+                >
+                    <UrlTile
+                        urlTemplate="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        maximumZ={19}
+                        flipY={false}
+                    />
+                </MapView>
+                ) : (
+                    <View style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center' }]}>
+                        <ActivityIndicator size="large" color={COLORS.yellow} />
+                        <Text style={{ marginTop: 10, color: COLORS.navy }}>{t('Locating GPS...')}</Text>
+                    </View>
+                )}
+                
+                {region && (
+                    <View style={styles.centerPinContainer} pointerEvents="none">
+                        <View style={[styles.centerPin, isDragging && styles.centerPinDragging]}>
+                            <Ionicons name="location" size={40} color={COLORS.navy} style={styles.pinIcon} />
+                            {/* The yellow dot inside */}
+                            <View style={styles.pinDot} />
+                        </View>
+                        {!isDragging && <View style={styles.pinShadow} />}
+                    </View>
+                )}
+
+                {/* GPS FAB */}
+                <TouchableOpacity style={styles.gpsFab} onPress={handleRecenter}>
+                    <MaterialCommunityIcons name="crosshairs-gps" size={24} color={COLORS.navy} />
+                </TouchableOpacity>
+
+                {/* Loading state indicator over the map */}
+                {loading && (
+                    <View style={styles.innerLoadingOverlay}>
+                        <ActivityIndicator size="large" color={COLORS.yellow} />
+                    </View>
+                )}
+            </View>
 
             {/* Bottom Card */}
             <View style={[styles.bottomCard, { paddingBottom: Math.max(insets.bottom, 20) }]}>
@@ -273,99 +354,7 @@ export default function MapPickerScreen() {
                 </TouchableOpacity>
             </View>
 
-            {/* Active Search Overlay Modal */}
-            <Modal visible={isSearchActive} animationType="fade" transparent={true}>
-                <BlurView
-                    style={StyleSheet.absoluteFillObject}
-                    intensity={80}
-                    tint="dark"
-                >
-                    <View style={[styles.searchOverlayContainer, { paddingTop: Math.max(insets.top, 20) }]}>
-                        {/* Search Input Floating Card */}
-                        <View style={styles.searchOverlayHeaderCard}>
-                            <TouchableOpacity onPress={() => setIsSearchActive(false)} style={styles.searchOverlayBackBtn}>
-                                <Ionicons name="arrow-back" size={24} color={COLORS.navy} />
-                            </TouchableOpacity>
-                            <TextInput
-                                style={styles.searchOverlayInput}
-                                autoFocus={true}
-                                value={searchText}
-                                onChangeText={onSearchChange}
-                                placeholder={t('Search location...')}
-                                placeholderTextColor={COLORS.textGray}
-                            />
-                            {searchText.length > 0 && (
-                                <TouchableOpacity onPress={() => {
-                                    setSearchText('');
-                                    setSearchResults([]);
-                                }} style={styles.searchOverlayClearBtn}>
-                                    <Ionicons name="close-circle" size={20} color={COLORS.iconGray} />
-                                </TouchableOpacity>
-                            )}
-                        </View>
-
-                        {/* Recent Locations (When text is empty) */}
-                        {searchText.length === 0 && (
-                            <View style={styles.searchResultsContainer}>
-                                {recentLocations.map((location, index) => (
-                                    <React.Fragment key={location.id}>
-                                        <TouchableOpacity
-                                            style={styles.searchResultItem}
-                                            onPress={() => handleSelectResult(location.lat, location.lon)}
-                                        >
-                                            <View style={styles.resultIconBgPin}>
-                                                <Ionicons name="time-outline" size={20} color={COLORS.textGray} />
-                                            </View>
-                                            <View style={styles.resultTextContainer}>
-                                                <Text style={styles.highlightText} numberOfLines={1}>
-                                                    {location.name}
-                                                </Text>
-                                                <Text style={styles.resultTextNormal} numberOfLines={1}>
-                                                    {t('Previous delivery')}
-                                                </Text>
-                                            </View>
-                                        </TouchableOpacity>
-                                        {index < recentLocations.length - 1 && <View style={styles.resultDivider} />}
-                                    </React.Fragment>
-                                ))}
-                            </View>
-                        )}
-
-                        {/* Search Results List (Live API) */}
-                        {searchText.length > 0 && searchResults.length > 0 && (
-                            <View style={styles.searchResultsContainer}>
-                                {searchResults.map((result, index) => (
-                                    <React.Fragment key={index}>
-                                        <TouchableOpacity
-                                            style={styles.searchResultItem}
-                                            onPress={() => handleSelectResult(result.lat, result.lon)}
-                                        >
-                                            <View style={styles.resultIconBgPin}>
-                                                <Ionicons name="location" size={20} color={COLORS.textGray} />
-                                            </View>
-                                            <View style={styles.resultTextContainer}>
-                                                <Text style={styles.resultTextNormal} numberOfLines={2}>
-                                                    {result.display_name}
-                                                </Text>
-                                            </View>
-                                        </TouchableOpacity>
-                                        {index < searchResults.length - 1 && <View style={styles.resultDivider} />}
-                                    </React.Fragment>
-                                ))}
-                            </View>
-                        )}
-
-                        {isFetchingAddress && searchResults.length === 0 && (
-                            <View style={styles.searchResultsContainer}>
-                                <View style={[styles.searchResultItem, { justifyContent: 'center', paddingVertical: 20 }]}>
-                                    <ActivityIndicator size="small" color={COLORS.navy} />
-                                </View>
-                            </View>
-                        )}
-                    </View>
-                </BlurView>
-            </Modal>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 
@@ -380,6 +369,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: COLORS.lightGray,
     },
+    innerLoadingOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 100,
+    },
     topOverlay: {
         position: 'absolute',
         top: 0,
@@ -387,6 +383,10 @@ const styles = StyleSheet.create({
         right: 0,
         zIndex: 10,
         paddingHorizontal: 20,
+    },
+    mapContainer: {
+        flex: 1,
+        position: 'relative',
     },
     searchBar: {
         flexDirection: 'row',
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
     gpsFab: {
         position: 'absolute',
         right: 20,
-        bottom: 220, // above the bottom card
+        bottom: 20, // above the bottom of map container
         width: 50,
         height: 50,
         borderRadius: 25,
@@ -467,10 +467,6 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
     bottomCard: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
         backgroundColor: COLORS.white,
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,

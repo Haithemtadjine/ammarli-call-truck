@@ -3,15 +3,17 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+    Alert,
     Animated,
     Image,
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppStore } from '../src/store/useAppStore';
 import { useTheme } from '../src/theme/ThemeContext';
 
@@ -43,9 +45,8 @@ export default function TankDetailsScreen() {
     const styles = getStyles(COLORS);
 
     const router = useRouter();
-    const insets = useSafeAreaInsets();
     const { t } = useTranslation();
-    const { activeOrder, updateOrder } = useAppStore();
+    const { activeOrder, updateOrder, draftOrder, updateDraftOrder } = useAppStore();
 
     // Unchanged Params Logic
     const params = useLocalSearchParams();
@@ -58,7 +59,9 @@ export default function TankDetailsScreen() {
     const isConstruction = currentType.toLowerCase().includes('construction') || currentType.includes('أشغال') || currentType.includes('اشغال');
     const isLargeTanker = currentType.toLowerCase().includes('large') || currentType.includes('صهاريج') || currentType.includes('كبيرة');
 
-    const [finalAddress, setFinalAddress] = useState<string>((address as string) || 'Bouzouran, Batna');
+    const [finalAddress, setFinalAddress] = useState<string>(
+        draftOrder.location?.address || (params.address as string) || ''
+    );
 
     // New UI States
     let defaultQty = 3000;
@@ -66,10 +69,40 @@ export default function TankDetailsScreen() {
     else if (isWellWater || isConstruction) defaultQty = 1000;
     else if (isLargeTanker) defaultQty = 3000;
 
-    const [tankLocation, setTankLocation] = useState('ground');
-    const [floorNumber, setFloorNumber] = useState(0); // Ground floor fallback
-    const [quantity, setQuantity] = useState(initialQty ? Number(initialQty) : defaultQty);
-    const [hoseLength, setHoseLength] = useState('standard');
+    const [tankLocation, setTankLocation] = useState(draftOrder.tankerDetails.tankLocation);
+    const [floorNumber, setFloorNumber] = useState(draftOrder.tankerDetails.floorNumber);
+    const [quantity, setQuantity] = useState(draftOrder.tankerDetails.quantity);
+    const [hoseLength, setHoseLength] = useState(draftOrder.tankerDetails.hoseLength);
+
+    // Sync state to draftOrder
+    useEffect(() => {
+        updateDraftOrder({
+            tankerDetails: {
+                quantity,
+                hoseLength,
+                tankLocation,
+                floorNumber,
+            }
+        });
+    }, [quantity, hoseLength, tankLocation, floorNumber]);
+
+    useEffect(() => {
+        if (lockedAddress) {
+            setFinalAddress(lockedAddress as string);
+        }
+    }, [lockedAddress]);
+
+    useEffect(() => {
+        if (params.lockedLat && params.lockedLng) {
+            updateDraftOrder({
+                location: {
+                    latitude: Number(params.lockedLat),
+                    longitude: Number(params.lockedLng),
+                    address: lockedAddress as string,
+                }
+            });
+        }
+    }, [params.lockedLat, params.lockedLng, lockedAddress]);
     const [showLocationError, setShowLocationError] = useState(false);
 
     // Animation: Shake
@@ -116,8 +149,11 @@ export default function TankDetailsScreen() {
     const totalPriceText = computedPrice.toLocaleString();
 
     const handleConfirm = () => {
-        // Validation: Location must be locked/selected
-        if (!params.lockedLat || !params.lockedLng) {
+        // Validation: Location must be locked/selected in store or params
+        const currentLat = params.lockedLat || draftOrder.location?.latitude;
+        const currentLng = params.lockedLng || draftOrder.location?.longitude;
+
+        if (!currentLat || !currentLng) {
             triggerShake();
             return;
         }
@@ -134,11 +170,11 @@ export default function TankDetailsScreen() {
             status: 'searching',
             quantity: finalQuantity,
             price: computedPrice,
-            locationName: finalAddress || 'Selected Location',
+            locationName: finalAddress || 'Unknown Location',
             orderTime: currentTime,
             location: {
-                latitude: Number(params.lockedLat),
-                longitude: Number(params.lockedLng),
+                latitude: Number(currentLat),
+                longitude: Number(currentLng),
             }
         } as any);
 
@@ -159,13 +195,15 @@ export default function TankDetailsScreen() {
     };
 
     const handleSchedule = () => {
-        // Validation: Location must be locked/selected
-        if (!params.lockedLat || !params.lockedLng) {
-            triggerShake();
+        const currentLat = params.lockedLat || draftOrder.location?.latitude;
+        if (quantity === 0 || !currentLat) {
+            Alert.alert(
+                t('Alert'),
+                'يرجى تحديد الكمية ومكان التوصيل أولاً قبل جدولة الطلب'
+            );
             return;
         }
-        // Unchanged navigation destination
-        router.push('/schedule-delivery' as any);
+        router.push('/schedule-delivery');
     };
 
     const increaseQty = () => setQuantity(prev => {
@@ -181,9 +219,9 @@ export default function TankDetailsScreen() {
     console.log('Type:', currentType, '| isSpringWater:', isSpringWater, '| isWell:', isWellWater, '| isConst:', isConstruction, '| isLarge:', isLargeTanker);
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             {/* Header */}
-            <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
+            <View style={[styles.header, { paddingTop: 20 }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={COLORS.navy} />
                 </TouchableOpacity>
@@ -222,7 +260,7 @@ export default function TankDetailsScreen() {
                         </View>
                         <View style={styles.locationDetails}>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.locationTitle} numberOfLines={1}>{finalAddress}</Text>
+                                <Text style={styles.locationTitle} numberOfLines={1}>{finalAddress || t('Select delivery location')}</Text>
                                 <Text style={styles.locationSubtitle}>{t('Primary Delivery Address')}</Text>
                             </View>
                             <Ionicons name="pencil" size={20} color={showLocationError ? '#EF4444' : COLORS.textGray} />
@@ -300,9 +338,20 @@ export default function TankDetailsScreen() {
                         <Ionicons name="remove" size={24} color={COLORS.white} />
                     </TouchableOpacity>
 
-                    <Text style={styles.qtyValueText}>
-                        {quantity} <Text style={styles.qtyValueUnit}>L</Text>
-                    </Text>
+                    <View style={styles.qtyInputRow}>
+                        <TextInput
+                            style={styles.qtyValueText}
+                            keyboardType="numeric"
+                            value={String(quantity)}
+                            onChangeText={(text) => {
+                                const clean = text.replace(/[^0-9]/g, '');
+                                const num = parseInt(clean, 10);
+                                setQuantity(isNaN(num) ? 0 : num);
+                            }}
+                            selectTextOnFocus
+                        />
+                        <Text style={styles.qtyValueUnit}>L</Text>
+                    </View>
 
                     <TouchableOpacity style={styles.qtyBtn} onPress={increaseQty}>
                         <Ionicons name="add" size={24} color={COLORS.white} />
@@ -347,7 +396,7 @@ export default function TankDetailsScreen() {
             </ScrollView>
 
             {/* 5. Fixed Bottom Footer */}
-            <View style={[styles.fixedFooter, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+            <View style={[styles.fixedFooter, { paddingBottom: 20 }]}>
                 {/* Price Row */}
                 <View style={styles.priceRow}>
                     <View>
@@ -362,16 +411,15 @@ export default function TankDetailsScreen() {
                 {/* Actions Row */}
                 <View style={styles.actionRow}>
                     <TouchableOpacity style={styles.btnSchedule} onPress={handleSchedule}>
-                        <Ionicons name="calendar" size={18} color={COLORS.white} />
-                        <Text style={styles.btnScheduleText}>{t('Schedule')}</Text>
+                        <Text style={styles.btnScheduleText}>Schedule</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.btnOrder} onPress={handleConfirm}>
-                        <Text style={styles.btnOrderText}>{t('Order Now  ➔')}</Text>
+                        <Text style={styles.btnOrderText}>Order Now</Text>
                     </TouchableOpacity>
                 </View>
             </View>
-        </View>
+        </SafeAreaView>
     );
 }
 
@@ -586,15 +634,23 @@ const getStyles = (COLORS: any) => StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    qtyInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     qtyValueText: {
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: 'bold',
         color: COLORS.navy,
+        width: 80,
+        textAlign: 'center',
+        padding: 0,
     },
     qtyValueUnit: {
         fontSize: 20,
         fontWeight: 'bold',
         color: COLORS.navy,
+        marginLeft: 4,
     },
 
     /* 4. Hose Length Cards */
@@ -701,32 +757,37 @@ const getStyles = (COLORS: any) => StyleSheet.create({
         gap: 12, // React Native handles gap in newer versions for flexDirection
     },
     btnSchedule: {
-        width: '35%',
-        backgroundColor: COLORS.navy,
-        borderRadius: 30, // fully rounded pill
-        paddingVertical: 16,
-        flexDirection: 'column',
+        flex: 1,
+        backgroundColor: 'transparent',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: COLORS.navy,
         justifyContent: 'center',
         alignItems: 'center',
+        paddingVertical: 16,
     },
     btnScheduleText: {
-        color: COLORS.white,
-        fontSize: 12,
-        fontWeight: '600',
-        marginTop: 2,
+        color: COLORS.navy,
+        fontSize: 17,
+        fontWeight: 'bold',
     },
     btnOrder: {
-        width: '63%',
+        flex: 1,
         backgroundColor: COLORS.yellow,
-        borderRadius: 30, // fully rounded pill
+        borderRadius: 16,
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
         paddingVertical: 16,
+        shadowColor: COLORS.yellow,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
     },
     btnOrderText: {
-        color: '#003366', // Keep explicit navy on yellow button
-        fontSize: 16,
+        color: COLORS.navy,
+        fontSize: 17,
         fontWeight: 'bold',
     },
 });

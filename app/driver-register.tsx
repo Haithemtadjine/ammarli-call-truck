@@ -12,6 +12,8 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    Image,
+    ToastAndroid,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore } from '../src/store/useAppStore';
@@ -26,13 +28,27 @@ const LABEL = '#6B7280';
 
 const WATER_TYPES = ['Spring', 'Well', 'Construction'];
 const BOTTLED_BRANDS = [
-    'Guedila', 'Ifri', 'Lalla Khedidja', 'Saïda',
-    'Youkous', 'Toudja', 'Messerghine', 'Mansoura',
+    'Ifri', 'Guedila', 'Saida', 'Lalla Khedidja',
+    'Youkous', 'Hayat', 'Mansourah', 'Texanna',
+    'Toudja', 'Messerghine',
 ];
 const CAP_MIN = 500;
 const CAP_MAX = 10000;
 const CAP_STEP = 500;
 const CAP_STEPS = (CAP_MAX - CAP_MIN) / CAP_STEP; // 19 steps
+
+const BRAND_LOGOS: Record<string, any> = {
+    'Ifri':           require('../assets/brands/ifri.png'),
+    'Guedila':        require('../assets/brands/guedila.png'),
+    'Saida':          require('../assets/brands/saida.png'),
+    'Lalla Khedidja': require('../assets/brands/lalla-khedidja.png'),
+    'Youkous':        require('../assets/brands/youkous.png'),
+    'Hayat':          require('../assets/brands/hayat.jpg'),
+    'Mansourah':      require('../assets/brands/mansourah.png'),
+    'Texanna':        require('../assets/brands/texanna.png'),
+    'Toudja':         require('../assets/brands/toudja.png'),
+    'Messerghine':    require('../assets/brands/messerghine.png'),
+};
 
 // ─── Screen ────────────────────────────────────────────────────────────────────
 export default function DriverRegisterScreen() {
@@ -61,17 +77,6 @@ export default function DriverRegisterScreen() {
     const toggleBrand = (b: string) =>
         setSelectedBrands((p) => p.includes(b) ? p.filter((x) => x !== b) : [...p, b]);
 
-    // Capacity from track press position (simple discrete slider)
-    const [sliderWidth, setSliderWidth] = useState(1);
-    const sliderPct = (capacity - CAP_MIN) / (CAP_MAX - CAP_MIN);
-
-    const onSliderPress = (evt: any) => {
-        const x = evt.nativeEvent.locationX;
-        const pct = Math.min(1, Math.max(0, x / sliderWidth));
-        const raw = CAP_MIN + Math.round((pct * (CAP_MAX - CAP_MIN)) / CAP_STEP) * CAP_STEP;
-        setCapacity(raw);
-    };
-
     // Submit
     const handleRegister = () => {
         if (!name.trim() || !phone.trim() || !password.trim() || !plate.trim()) {
@@ -99,7 +104,18 @@ export default function DriverRegisterScreen() {
                     : { brands: selectedBrands }),
             });
             setLoading(false);
-            router.replace('/driver-pending');
+            
+            if (Platform.OS === 'android') {
+                ToastAndroid.show(t('Account created successfully. Welcome!'), ToastAndroid.SHORT);
+            } else {
+                Alert.alert(t('Success'), t('Account created successfully. Welcome!'));
+            }
+
+            if (category === 'Tanker') {
+                router.replace('/(driver)/tanker-dashboard');
+            } else {
+                router.replace('/(driver)/driver-home');
+            }
         }, 1000);
     };
 
@@ -249,31 +265,26 @@ export default function DriverRegisterScreen() {
                             </View>
 
                             {/* TANK CAPACITY */}
-                            <View style={styles.capacityHeader}>
-                                <Text style={styles.fieldLabel}>TANK CAPACITY</Text>
-                                <View style={styles.capacityBadge}>
-                                    <Text style={styles.capacityBadgeText}>
-                                        {capacity.toLocaleString()} L
-                                    </Text>
+                            <Text style={styles.fieldLabel}>TANK CAPACITY (Liters)</Text>
+                            <View style={styles.capacityInputContainer}>
+                                <TextInput
+                                    style={styles.capacityInput}
+                                    placeholder="Enter tank capacity"
+                                    placeholderTextColor={LABEL}
+                                    keyboardType="numeric"
+                                    value={capacity === 0 ? '' : capacity.toString()}
+                                    onChangeText={(text) => {
+                                        const numericValue = text.replace(/[^0-9]/g, '');
+                                        setCapacity(numericValue === '' ? 0 : parseInt(numericValue, 10));
+                                    }}
+                                />
+                                <View style={styles.litersSuffix}>
+                                    <Text style={styles.litersText}>L</Text>
                                 </View>
                             </View>
-
-                            {/* Custom Slider (touchable track) */}
-                            <View
-                                style={styles.sliderTrack}
-                                onLayout={(e) => setSliderWidth(e.nativeEvent.layout.width)}
-                                onStartShouldSetResponder={() => true}
-                                onMoveShouldSetResponder={() => true}
-                                onResponderGrant={onSliderPress}
-                                onResponderMove={onSliderPress}
-                            >
-                                <View style={[styles.sliderFill, { width: `${sliderPct * 100}%` }]} />
-                                <View style={[styles.sliderThumb, { left: `${sliderPct * 100}%` as any }]} />
-                            </View>
-                            <View style={styles.sliderLabels}>
-                                <Text style={styles.sliderLabelText}>{CAP_MIN.toLocaleString()} L</Text>
-                                <Text style={styles.sliderLabelText}>{CAP_MAX.toLocaleString()} L</Text>
-                            </View>
+                            <Text style={styles.capacityInfo}>
+                                Recommended: {CAP_MIN.toLocaleString()}L - {CAP_MAX.toLocaleString()}L
+                            </Text>
                         </>
                     )}
 
@@ -285,23 +296,25 @@ export default function DriverRegisterScreen() {
                             <View style={styles.brandGrid}>
                                 {BOTTLED_BRANDS.map((b) => {
                                     const active = selectedBrands.includes(b);
+                                    const logo = BRAND_LOGOS[b];
                                     return (
                                         <TouchableOpacity
                                             key={b}
                                             style={[styles.brandPill, active && styles.brandPillActive]}
                                             onPress={() => toggleBrand(b)}
                                         >
+                                            {logo && <Image source={logo} style={styles.brandLogoSmall} />}
+                                            <Text style={[styles.brandPillText, active && styles.brandPillTextActive]}>
+                                                {b}
+                                            </Text>
                                             {active && (
                                                 <Ionicons
                                                     name="checkmark-circle"
                                                     size={14}
                                                     color={NAVY}
-                                                    style={{ marginRight: 4 }}
+                                                    style={{ marginLeft: 6 }}
                                                 />
                                             )}
-                                            <Text style={[styles.brandPillText, active && styles.brandPillTextActive]}>
-                                                {b}
-                                            </Text>
                                         </TouchableOpacity>
                                     );
                                 })}
@@ -360,7 +373,7 @@ const styles = StyleSheet.create({
     headerTitle: { fontSize: 20, fontWeight: 'bold', color: NAVY },
 
     // Scroll
-    scroll: { paddingHorizontal: 20, paddingTop: 8 },
+    scroll: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20 },
 
     // Labels above inputs
     fieldLabel: {
@@ -436,64 +449,44 @@ const styles = StyleSheet.create({
     pillText: { fontSize: 14, fontWeight: '600', color: TEXT },
     pillTextActive: { color: '#FFFFFF' },
 
-    // Capacity header row
-    capacityHeader: {
+    // Capacity Input
+    capacityInputContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
+        backgroundColor: GRAY,
+        borderRadius: 14,
+        height: 60,
+        paddingHorizontal: 15,
+        borderWidth: 1.5,
+        borderColor: BORDER,
     },
-    capacityBadge: {
-        backgroundColor: '#FEF9C3',
-        borderRadius: 8,
+    capacityInput: {
+        flex: 1,
+        fontSize: 16,
+        fontWeight: '600',
+        color: TEXT,
+        textAlign: 'left',
+        paddingVertical: 10,
+    },
+    litersSuffix: {
+        backgroundColor: YELLOW,
+        borderRadius: 12,
         paddingHorizontal: 12,
-        paddingVertical: 5,
-        marginTop: 16,
+        paddingVertical: 6,
+        marginLeft: 10,
     },
-    capacityBadgeText: {
-        fontSize: 14,
+    litersText: {
+        fontSize: 18,
         fontWeight: 'bold',
         color: NAVY,
     },
-
-    // Slider
-    sliderTrack: {
-        height: 6,
-        backgroundColor: BORDER,
-        borderRadius: 3,
-        marginTop: 18,
-        marginBottom: 4,
-        position: 'relative',
-        justifyContent: 'center',
+    capacityInfo: {
+        fontSize: 12,
+        color: LABEL,
+        marginTop: 8,
+        textAlign: 'center',
+        fontStyle: 'italic',
     },
-    sliderFill: {
-        position: 'absolute',
-        left: 0,
-        height: 6,
-        backgroundColor: NAVY,
-        borderRadius: 3,
-    },
-    sliderThumb: {
-        position: 'absolute',
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        backgroundColor: NAVY,
-        borderWidth: 3,
-        borderColor: '#FFFFFF',
-        marginLeft: -10,
-        top: -7,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 4,
-    },
-    sliderLabels: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 6,
-    },
-    sliderLabelText: { fontSize: 11, color: LABEL },
 
     // Brand pills (Bottled)
     brandNote: { fontSize: 13, color: LABEL, marginBottom: 12 },
@@ -511,10 +504,17 @@ const styles = StyleSheet.create({
     brandPillActive: { borderColor: YELLOW, backgroundColor: '#FFFDE7' },
     brandPillText: { fontSize: 14, fontWeight: '600', color: LABEL },
     brandPillTextActive: { color: NAVY, fontWeight: 'bold' },
+    brandLogoSmall: {
+        width: 18,
+        height: 18,
+        marginRight: 8,
+        resizeMode: 'contain',
+    },
 
     // Register button
     registerBtn: {
-        marginTop: 32,
+        marginTop: 'auto',
+        marginBottom: 10,
         backgroundColor: NAVY,
         borderRadius: 16,
         paddingVertical: 17,

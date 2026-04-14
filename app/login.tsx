@@ -1,9 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-// import { signInWithEmailAndPassword } from 'firebase/auth'; // TEMPORARILY DISABLED
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-// import { auth } from '../src/firebaseConfig'; // TEMPORARILY DISABLED
+import {
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+    ToastAndroid,
+    Alert,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { saveUserSession } from '../src/utils/storage';
 
@@ -30,8 +40,13 @@ export default function LoginScreen() {
             // 2. Save it to AsyncStorage so the app remembers you
             await saveUserSession(dummyUid);
 
-            // 3. Navigate to Success Screen
-            router.replace('/success');
+            // 3. Navigate directly to Home
+            if (Platform.OS === 'android') {
+                ToastAndroid.show(t('Login successful. Welcome back!'), ToastAndroid.SHORT);
+            } else {
+                Alert.alert(t('Success'), t('Login successful. Welcome back!'));
+            }
+            router.replace('/(tabs)');
         } catch (error: any) {
             alert(t('Login processing error: ') + error.message);
         } finally {
@@ -45,73 +60,70 @@ export default function LoginScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
             >
-                {/* Header */}
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => { if (router.canGoBack()) router.back(); }} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={24} color="#0B2545" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>{t('Login')}</Text>
-                    <View style={styles.headerPlaceholder} />
-                </View>
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
+                    <View style={styles.content}>
+                        <Text style={styles.title}>{t('Welcome Back')}</Text>
+                        <Text style={styles.subtitle}>{t('Log in to manage your water deliveries.')}</Text>
 
-                <View style={styles.content}>
-                    <Text style={styles.title}>{t('Welcome Back')}</Text>
-                    <Text style={styles.subtitle}>{t('Log in to manage your water deliveries.')}</Text>
+                        {/* Form */}
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.label}>{t('Phone Number')}</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder={t('Enter your phone number')}
+                                placeholderTextColor="#9CA3AF"
+                                keyboardType="phone-pad"
+                                value={phone}
+                                onChangeText={setPhone}
+                            />
+                        </View>
 
-                    {/* Form */}
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.label}>{t('Phone Number')}</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder={t('Enter your phone number')}
-                            placeholderTextColor="#9CA3AF"
-                            keyboardType="phone-pad"
-                            value={phone}
-                            onChangeText={setPhone}
-                        />
-                    </View>
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.label}>{t('Password')}</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder={t('Enter your password')}
+                                placeholderTextColor="#9CA3AF"
+                                secureTextEntry
+                                value={password}
+                                onChangeText={setPassword}
+                            />
+                        </View>
 
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.label}>{t('Password')}</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder={t('Enter your password')}
-                            placeholderTextColor="#9CA3AF"
-                            secureTextEntry
-                            value={password}
-                            onChangeText={setPassword}
-                        />
-                    </View>
+                        <TouchableOpacity style={styles.forgotPasswordContainer} onPress={() => router.push('/forgot-password' as any)}>
+                            <Text style={styles.forgotPasswordText}>{t('Forgot Password?')}</Text>
+                        </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.forgotPasswordContainer} onPress={() => router.push('/forgot-password' as any)}>
-                        <Text style={styles.forgotPasswordText}>{t('Forgot Password?')}</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.loginButton}
-                        onPress={handleLogin}
-                        disabled={loading}
-                    >
-                        <Text style={styles.loginButtonText}>{loading ? t('Logging in...') : t('Login')}</Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Footer */}
-                <View style={styles.footer}>
-                    <View style={styles.footerRow}>
-                        <Text style={styles.footerText}>{t("Don't have an account? ")}</Text>
-                        <TouchableOpacity onPress={() => router.push('/register')}>
-                            <Text style={styles.createAccountText}>{t('Create Account')}</Text>
+                        <TouchableOpacity
+                            style={styles.loginButton}
+                            onPress={handleLogin}
+                            disabled={loading}
+                        >
+                            <Text style={styles.loginButtonText}>{loading ? t('Logging in...') : t('Login')}</Text>
                         </TouchableOpacity>
                     </View>
-                    <TouchableOpacity
-                        onPress={() => router.replace('/role-selection')}
-                        style={styles.changeRoleBtn}
-                    >
-                        <Ionicons name="arrow-back-outline" size={14} color="#9CA3AF" />
-                        <Text style={styles.changeRoleText}> {t('Change Role')}</Text>
-                    </TouchableOpacity>
-                </View>
+
+                    {/* Footer */}
+                    <View style={styles.footer}>
+                        <View style={styles.footerRow}>
+                            <Text style={styles.footerText}>{t("Don't have an account? ")}</Text>
+                            <TouchableOpacity onPress={() => router.push('/register')}>
+                                <Text style={styles.createAccountText}>{t('Create Account')}</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity
+                            onPress={() => router.replace('/role-selection')}
+                            style={styles.changeRoleBtn}
+                        >
+                            <Ionicons name="arrow-back-outline" size={14} color="#9CA3AF" />
+                            <Text style={styles.changeRoleText}> {t('Change Role')}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
@@ -130,7 +142,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingTop: Platform.OS === 'android' ? 40 : 20,
+        paddingTop: 20,
         paddingBottom: 20,
     },
     backButton: {
@@ -145,9 +157,11 @@ const styles = StyleSheet.create({
         width: 34, // Matches back button width to center the title
     },
     content: {
-        flex: 1,
         paddingHorizontal: 24,
         paddingTop: 40,
+    },
+    scrollContent: {
+        flexGrow: 1,
     },
     title: {
         fontSize: 32,
@@ -201,9 +215,11 @@ const styles = StyleSheet.create({
         color: '#0B2545',
     },
     footer: {
+        marginTop: 'auto',
         flexDirection: 'column',
         alignItems: 'center',
-        paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+        paddingBottom: 20,
+        paddingTop: 20,
         gap: 10,
     },
     footerRow: {

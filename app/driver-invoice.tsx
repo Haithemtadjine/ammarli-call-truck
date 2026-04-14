@@ -1,286 +1,284 @@
+import React, { useState } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    TouchableOpacity,
+    Dimensions,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
-import {
-    ScrollView,
-    Share,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore } from '../src/store/useAppStore';
 
-// ─── Theme ─────────────────────────────────────────────────────────────────────
+const { width, height } = Dimensions.get('window');
+
+// ─── Theme Colors ─────────────────────────────────────────────────────────────
 const NAVY = '#003366';
 const YELLOW = '#F3CD0D';
-const BG = '#F5F7FA';
 const WHITE = '#FFFFFF';
 const GRAY = '#6B7280';
-const GREEN = '#10B981';
+const LIGHT_GRAY = '#F8F9FA';
 const BORDER = '#E5E7EB';
 
 export default function DriverInvoiceScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { activeDriverOrder, completeDriverOrder } = useAppStore();
+    const { activeDriverOrder, completeDriverOrder, userRole } = useAppStore();
 
-    // Fallback mock so the screen is always previewable during development
-    const order = activeDriverOrder ?? {
-        orderId: '84291',
-        customer: { name: 'Ahmed Benali', phone: '+213 555 12 34 56' },
-        deliveryAddress: {
-            label: '2.5 km away — Batna, Algeria',
-            distance: '2.5 km',
-            lat: 35.5596,
-            lng: 6.1740,
-        },
-        driverLat: 35.5620,
-        driverLng: 6.1700,
-        items: [
-            { icon: 'cube', description: '5x 1.5L Packs (Ifri)', detail: 'Mineral Water', price: 1100 },
-        ],
-        subtotal: 1100,
-        deliveryFee: 150,
-        total: 1250,
-        status: 'completed' as const,
-        createdAt: new Date().toLocaleDateString('fr-DZ') + ' • ' + new Date().toLocaleTimeString('fr-DZ', { hour: '2-digit', minute: '2-digit' }),
+    const [rating, setRating] = useState(0);
+
+    // Fallback data for exact UI rendering
+    const order = activeDriverOrder || {
+        orderId: '28491',
+        customer: { name: 'Yassine', phone: '' },
+        deliveryAddress: { label: '', distance: '4.2 km' },
+        items: [{ description: '3000L Spring Water', detail: '', price: 2450, icon: '' }],
+        subtotal: 2450,
+        deliveryFee: 50,
+        total: 2500,
     };
 
-    const handleShare = async () => {
-        const lines = [
-            `🧾 Delivery Invoice — Ammarli`,
-            `Order #${order.orderId} | ${order.createdAt}`,
-            `Customer: ${order.customer.name} | ${order.customer.phone}`,
-            `Address: ${order.deliveryAddress.label}`,
-            ``,
-            ...order.items.map((i) => `• ${i.description} — ${i.price.toLocaleString()} DA`),
-            ``,
-            `Subtotal:     ${order.subtotal.toLocaleString()} DA`,
-            `Delivery Fee: ${order.deliveryFee.toLocaleString()} DA`,
-            `TOTAL:        ${order.total.toLocaleString()} DA`,
-        ].join('\n');
-        await Share.share({ message: lines });
+    // Determine primary item description
+    const primaryItem = order.items && order.items.length > 0 
+        ? order.items[0].description 
+        : 'Water Delivery';
+
+    const handleGoHome = () => {
+        if (userRole === 'DRIVER_TANKER') {
+            router.replace('/(driver)/tanker-dashboard');
+        } else if (userRole === 'DRIVER_BOTTLED') {
+            router.replace('/(driver)/driver-home');
+        } else if (userRole === 'CUSTOMER') {
+            router.replace('/(tabs)'); // Default to correct customer layout mapping
+        } else {
+            router.replace('/');
+        }
     };
 
     const handleDone = () => {
         completeDriverOrder();
-        router.replace('/driver-home');
+        handleGoHome();
     };
 
     return (
-        <View style={[styles.root, { paddingTop: insets.top }]}>
-            <StatusBar barStyle="dark-content" />
-
-            {/* Header */}
-            <View style={styles.header}>
-                <View style={{ width: 40 }} />
-                <Text style={styles.headerTitle}>Invoice</Text>
-                <TouchableOpacity onPress={handleShare} style={styles.shareBtn}>
-                    <Ionicons name="share-social-outline" size={22} color={NAVY} />
-                </TouchableOpacity>
-            </View>
-
-            <ScrollView
-                contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]}
-                showsVerticalScrollIndicator={false}
-            >
-                {/* ── SUCCESS BANNER */}
-                <View style={styles.successBanner}>
-                    <View style={styles.successIconCircle}>
-                        <Ionicons name="checkmark-sharp" size={40} color={NAVY} />
+        <BlurView intensity={90} tint="light" style={styles.overlayContainer}>
+            
+            {/* ── Main White Card ── */}
+            <View style={styles.mainCard}>
+                
+                {/* Header Checkmark */}
+                <View style={styles.checkCircleWrap}>
+                    <View style={styles.checkCircle}>
+                        <Ionicons name="checkmark-sharp" size={36} color={WHITE} />
                     </View>
-                    <Text style={styles.successTitle}>Delivered Successfully!</Text>
-                    <Text style={styles.successSub}>Payment confirmed • Thank you</Text>
                 </View>
 
-                {/* ── ORDER META */}
-                <View style={styles.metaCard}>
-                    <MetaRow label="Order ID" value={`#${order.orderId}`} />
-                    <MetaRow label="Date" value={order.createdAt} />
-                    <MetaRow label="Status" value="Completed" green />
-                    <MetaRow label="Customer" value={order.customer.name} />
-                    <MetaRow label="Phone" value={order.customer.phone} />
-                    <MetaRow label="Drop-off" value={order.deliveryAddress.label} last />
+                {/* Title & Subtitle */}
+                <Text style={styles.titleText}>Trip Completed{'\n'}Successfully!</Text>
+                <Text style={styles.subtitleText}>Your delivery has been safely handed over.</Text>
+                
+                {/* Horizontal Divider */}
+                <View style={styles.faintDivider} />
+
+                {/* ── INVOICE DETAILS ── */}
+                <View style={styles.detailsSection}>
+                    <View style={styles.detailsHeader}>
+                        <Ionicons name="receipt-outline" size={14} color={GRAY} />
+                        <Text style={styles.detailsHeaderText}>INVOICE DETAILS</Text>
+                    </View>
+
+                    <DetailRow label="Order ID" value={`#${order.orderId}`} />
+                    <DetailRow label="Customer" value={order.customer.name} />
+                    <DetailRow label="Item" value={primaryItem} />
+                    <DetailRow label="Distance" value={order.deliveryAddress.distance || '4.2 km'} />
                 </View>
 
-                {/* ── ORDER ITEMS */}
-                <SectionLabel text="ORDER ITEMS" />
-                <View style={styles.itemsCard}>
-                    {order.items.map((item, i) => (
-                        <View
-                            key={i}
-                            style={[
-                                styles.itemRow,
-                                i > 0 && { borderTopWidth: 1, borderTopColor: BORDER, paddingTop: 14, marginTop: 14 },
-                            ]}
-                        >
-                            <View style={styles.itemIconBox}>
-                                <Ionicons name={item.icon as any} size={20} color={NAVY} />
-                            </View>
-                            <View style={{ flex: 1, marginLeft: 12 }}>
-                                <Text style={styles.itemDesc}>{item.description}</Text>
-                                <Text style={styles.itemDetail}>{item.detail}</Text>
-                            </View>
-                            <Text style={styles.itemPrice}>{item.price.toLocaleString()} DA</Text>
-                        </View>
-                    ))}
-                </View>
-
-                {/* ── PRICING BREAKDOWN */}
-                <View style={styles.pricingCard}>
-                    <PricingRow label="Subtotal" value={order.subtotal} />
-                    <PricingRow label="Delivery Fee" value={order.deliveryFee} />
-                    <View style={styles.totalDivider} />
+                {/* ── EARNINGS BOX ── */}
+                <View style={styles.earningsBox}>
+                    <DetailRow label="Subtotal" value={`${order.subtotal.toLocaleString()} DA`} />
+                    <DetailRow label="Delivery Fee" value={`${order.deliveryFee.toLocaleString()} DA`} />
+                    <View style={styles.boxDivider} />
+                    
                     <View style={styles.totalRow}>
-                        <Text style={styles.totalLabel}>Total Amount</Text>
-                        <Text style={styles.totalValue}>{order.total.toLocaleString()} DA</Text>
+                        <Text style={styles.totalEarningsLabel}>TOTAL EARNINGS</Text>
+                        <Text style={styles.totalPriceText}>{order.total.toLocaleString()} DA</Text>
                     </View>
                 </View>
-            </ScrollView>
 
-            {/* ── STICKY BOTTOM */}
-            <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-                <TouchableOpacity style={styles.doneBtn} onPress={handleDone} activeOpacity={0.85}>
-                    <Text style={styles.doneBtnText}>Back to Dashboard</Text>
-                    <Ionicons name="home" size={18} color={NAVY} style={{ marginLeft: 8 }} />
+                {/* ── RATE CUSTOMER ── */}
+                <View style={styles.ratingSection}>
+                    <Text style={styles.ratingTitle}>Rate the Customer</Text>
+                    <View style={styles.starsRow}>
+                        {[1, 2, 3, 4, 5].map((starIndex) => (
+                            <TouchableOpacity
+                                key={starIndex}
+                                activeOpacity={0.7}
+                                onPress={() => setRating(starIndex)}
+                                style={styles.starBtn}
+                            >
+                                <Ionicons
+                                    name={starIndex <= rating ? "star" : "star-outline"}
+                                    size={36}
+                                    color={starIndex <= rating ? YELLOW : '#D1D5DB'}
+                                />
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+
+                {/* ── ACTION BUTTON ── */}
+                <TouchableOpacity style={styles.backBtn} activeOpacity={0.88} onPress={handleDone}>
+                    <Text style={styles.backBtnText}>BACK TO DASHBOARD</Text>
+                    <Ionicons name="arrow-forward" size={20} color={WHITE} />
                 </TouchableOpacity>
+
             </View>
-        </View>
+
+            {/* ── FOOTER TEXT ── */}
+            <View style={[styles.footerWrap, { bottom: Math.max(insets.bottom + 20, 30) }]}>
+                <Text style={styles.footerText}>POWERED BY AMMARLI</Text>
+            </View>
+            
+        </BlurView>
     );
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
-function SectionLabel({ text }: { text: string }) {
-    return <Text style={styles.sectionLabel}>{text}</Text>;
-}
-
-function MetaRow({ label, value, green = false, last = false }: {
-    label: string; value: string; green?: boolean; last?: boolean;
-}) {
+// ─── Sub-Component ─────────────────────────────────────────────────────────────
+function DetailRow({ label, value }: { label: string; value: string }) {
     return (
-        <View style={[styles.metaRow, !last && { borderBottomWidth: 1, borderBottomColor: BORDER }]}>
-            <Text style={styles.metaLabel}>{label}</Text>
-            <Text style={[styles.metaValue, green && { color: GREEN }]}>{value}</Text>
+        <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>{label}</Text>
+            <Text style={styles.detailValue}>{value}</Text>
         </View>
     );
 }
 
-function PricingRow({ label, value }: { label: string; value: number }) {
-    return (
-        <View style={styles.pricingRow}>
-            <Text style={styles.pricingLabel}>{label}</Text>
-            <Text style={styles.pricingValue}>{value.toLocaleString()} DA</Text>
-        </View>
-    );
-}
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-    root: { flex: 1, backgroundColor: BG },
-
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: WHITE,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: BORDER,
-    },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: NAVY },
-    shareBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'flex-end' },
-
-    scroll: { paddingHorizontal: 16, paddingTop: 20 },
-
-    // ── Success banner
-    successBanner: {
-        backgroundColor: NAVY,
-        borderRadius: 22,
-        paddingVertical: 32,
-        alignItems: 'center',
-        marginBottom: 20,
-        gap: 10,
-    },
-    successIconCircle: {
-        width: 80, height: 80,
-        borderRadius: 40,
-        backgroundColor: YELLOW,
+    overlayContainer: {
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 4,
+        paddingHorizontal: 20,
     },
-    successTitle: { fontSize: 22, fontWeight: 'bold', color: WHITE },
-    successSub: { fontSize: 14, color: 'rgba(255,255,255,0.65)' },
-
-    // ── Meta card
-    metaCard: {
+    
+    // Main Card
+    mainCard: {
+        width: '100%',
         backgroundColor: WHITE,
-        borderRadius: 18,
-        paddingHorizontal: 16,
-        marginBottom: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    metaRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+        borderRadius: 24,
+        paddingHorizontal: 28,
+        paddingBottom: 28,
         alignItems: 'center',
-        paddingVertical: 14,
-    },
-    metaLabel: { fontSize: 13, color: GRAY },
-    metaValue: { fontSize: 14, fontWeight: '600', color: NAVY, flex: 1, textAlign: 'right' },
-
-    // Section label
-    sectionLabel: {
-        fontSize: 11, fontWeight: '800', color: NAVY,
-        letterSpacing: 0.8, marginBottom: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 10,
     },
 
-    // Items card
-    itemsCard: {
-        backgroundColor: WHITE, borderRadius: 16, padding: 16, marginBottom: 14,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    // Checkmark Header
+    checkCircleWrap: {
+        marginTop: -35, // Pull it up to overflow the top
+        marginBottom: 20,
+        backgroundColor: WHITE,
+        borderRadius: 40,
+        padding: 6, // White border illusion
     },
-    itemRow: { flexDirection: 'row', alignItems: 'center' },
-    itemIconBox: {
-        width: 40, height: 40, borderRadius: 12,
-        backgroundColor: '#F0F4FA', justifyContent: 'center', alignItems: 'center',
+    checkCircle: {
+        width: 70, height: 70, borderRadius: 35,
+        backgroundColor: YELLOW,
+        justifyContent: 'center', alignItems: 'center',
+        shadowColor: YELLOW,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 10,
+        elevation: 5,
     },
-    itemDesc: { fontSize: 14, fontWeight: 'bold', color: NAVY },
-    itemDetail: { fontSize: 12, color: GRAY, marginTop: 1 },
-    itemPrice: { fontSize: 15, fontWeight: 'bold', color: NAVY },
+    titleText: {
+        fontSize: 22, fontWeight: '900', color: NAVY,
+        textAlign: 'center', lineHeight: 30, marginBottom: 8,
+    },
+    subtitleText: {
+        fontSize: 14, color: GRAY, textAlign: 'center', marginBottom: 24,
+    },
+    faintDivider: {
+        width: '100%', height: 1, backgroundColor: '#F1F5F9', marginBottom: 24,
+    },
 
-    // Pricing card
-    pricingCard: {
-        backgroundColor: WHITE, borderRadius: 16, padding: 18, marginBottom: 20,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    // Invoice Details
+    detailsSection: { width: '100%', marginBottom: 24 },
+    detailsHeader: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        marginBottom: 16,
     },
-    pricingRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-    pricingLabel: { fontSize: 14, color: GRAY },
-    pricingValue: { fontSize: 14, color: GRAY },
-    totalDivider: { height: 1, backgroundColor: BORDER, marginVertical: 10 },
-    totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    totalLabel: { fontSize: 16, fontWeight: 'bold', color: NAVY },
-    totalValue: { fontSize: 24, fontWeight: 'bold', color: NAVY },
+    detailsHeaderText: { fontSize: 12, fontWeight: '800', color: '#475569', letterSpacing: 1 },
+    detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' },
+    detailLabel: { fontSize: 15, color: '#64748B' },
+    detailValue: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
 
-    // Bottom bar
-    bottomBar: {
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        backgroundColor: WHITE, borderTopWidth: 1, borderTopColor: BORDER,
-        paddingHorizontal: 16, paddingTop: 12,
+    // Earnings Box
+    earningsBox: {
+        width: '100%',
+        backgroundColor: LIGHT_GRAY,
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
     },
-    doneBtn: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: YELLOW, borderRadius: 16, paddingVertical: 16,
-        shadowColor: YELLOW, shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    boxDivider: { width: '100%', height: 1, backgroundColor: '#E2E8F0', marginVertical: 14 },
+    totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+    totalEarningsLabel: { fontSize: 12, fontWeight: '800', color: NAVY, letterSpacing: 1 },
+    totalPriceText: { fontSize: 24, fontWeight: '900', color: NAVY },
+
+    // Rating Section
+    ratingSection: {
+        width: '100%',
+        alignItems: 'center',
+        marginBottom: 24,
     },
-    doneBtnText: { fontSize: 16, fontWeight: 'bold', color: NAVY },
+    ratingTitle: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: NAVY,
+        letterSpacing: 0.5,
+        marginBottom: 12,
+    },
+    starsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    starBtn: {
+        padding: 4,
+    },
+
+    // Action Button
+    backBtn: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'center', justifyContent: 'center', gap: 10,
+        backgroundColor: NAVY,
+        borderRadius: 16,
+        paddingVertical: 18,
+        shadowColor: NAVY,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    backBtnText: { fontSize: 15, fontWeight: '800', color: WHITE, letterSpacing: 0.5 },
+
+    // Footer Wrap
+    footerWrap: {
+        position: 'absolute',
+        width: '100%',
+        alignItems: 'center',
+    },
+    footerText: {
+        fontSize: 11, fontWeight: '800', color: '#94A3B8', letterSpacing: 2,
+    },
 });

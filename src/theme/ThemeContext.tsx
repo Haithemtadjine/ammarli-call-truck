@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useAppStore } from '../store/useAppStore';
 
 export type ThemeColors = {
     background: string;
@@ -40,29 +41,15 @@ type ThemeContextType = {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [isDarkMode, setIsDarkMode] = useState(false);
-    const [isLoaded, setIsLoaded] = useState(false);
+    // Read the dark mode preference from the global Zustard store directly
+    const isDarkMode = useAppStore((state: any) => state.appSettings.darkMode);
+    const updateAppSetting = useAppStore((state: any) => state.updateAppSetting);
 
-    useEffect(() => {
-        const loadTheme = async () => {
-            try {
-                const storedTheme = await AsyncStorage.getItem('app_theme');
-                if (storedTheme !== null) {
-                    setIsDarkMode(storedTheme === 'dark');
-                }
-            } catch (error) {
-                console.error('Failed to load theme:', error);
-            } finally {
-                setIsLoaded(true);
-            }
-        };
-        loadTheme();
-    }, []);
-
+    // Provide a toggle function to easily flip it
     const toggleTheme = async () => {
         try {
             const newTheme = !isDarkMode;
-            setIsDarkMode(newTheme);
+            updateAppSetting('darkMode', newTheme);
             await AsyncStorage.setItem('app_theme', newTheme ? 'dark' : 'light');
         } catch (error) {
             console.error('Failed to save theme:', error);
@@ -70,8 +57,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const colors = isDarkMode ? darkColors : lightColors;
-
-    if (!isLoaded) return null; // Or handle loading state elegantly
 
     return (
         <ThemeContext.Provider value={{ isDarkMode, colors, toggleTheme }}>

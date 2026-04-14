@@ -1,71 +1,44 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { Stack, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from "react";
 import '../src/localization/i18n';
 import { ThemeProvider } from '../src/theme/ThemeContext';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getUserSession } from "../src/utils/storage";
+
+// Prevent auto-hide so splash stays while we resolve route
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkSession = async () => {
-      const hasLaunched = await AsyncStorage.getItem('hasLaunched');
-
-      if (!hasLaunched) {
-        setTimeout(() => {
-          router.replace('/onboarding');
-        }, 100);
-        setLoading(false);
-        return;
-      }
-
-      const session = await getUserSession();
-      if (session) {
-        // User logged in mسبقاً, wait for layout to mount then redirect to success/main
-        // Using setTimeout to ensure navigation happens after layout mounts
-        setTimeout(async () => {
-          try {
-            let { status } = await Location.getForegroundPermissionsAsync();
-            let providerStatus = await Location.getProviderStatusAsync();
-
-            if (status === 'granted' && providerStatus.locationServicesEnabled) {
-              router.replace('/(tabs)');
-            } else {
-              router.replace('/gps');
-            }
-          } catch {
-            router.replace('/gps');
-          }
-        }, 100);
-      }
-      setLoading(false);
+    const prepareApp = async () => {
+      // Small delay just to let UI render initial frames, but generally immediate
+      await SplashScreen.hideAsync();
     };
-    checkSession();
-  }, [router]);
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: '#FFFFFF' }}>
-        <ActivityIndicator size="large" color="#FACC15" />
-      </View>
-    );
-  }
+    prepareApp();
+  }, []);
 
+  // Stack is ALWAYS rendered so the navigator is mounted before router.replace() fires
   return (
     <ThemeProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="login" />
-        <Stack.Screen name="register" />
-        <Stack.Screen name="success" />
-        <Stack.Screen name="gps" options={{ animation: 'fade' }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      </Stack>
+      <SafeAreaProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="login" />
+          <Stack.Screen name="register" />
+          <Stack.Screen name="success" />
+          <Stack.Screen name="gps" options={{ animation: 'fade' }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="driver-order-review" options={{ presentation: 'transparentModal', animation: 'fade', headerShown: false }} />
+          <Stack.Screen name="driver-invoice" options={{ presentation: 'transparentModal', animation: 'fade', headerShown: false }} />
+        </Stack>
+      </SafeAreaProvider>
     </ThemeProvider>
   );
 }

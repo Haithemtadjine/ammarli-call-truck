@@ -12,9 +12,10 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.ammarli.calltruck",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundColor": "#002952",
+        "foregroundImage": "./assets/images/icon.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
@@ -43,6 +44,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b7772a9e-a962-4f51-b790-2e96babde4ff"
+      }
+    },
+    "owner": "haithem_tadjine"
   }
 }

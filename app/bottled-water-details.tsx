@@ -3,29 +3,39 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+    Alert,
     Animated,
     Image,
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppStore } from '../src/store/useAppStore';
 import { useTheme } from '../src/theme/ThemeContext';
 
 // ─── Brand list ────────────────────────────────────────────────────────────────
 const BRANDS = [
-    'Guedila',
-    'Ifri',
-    'Lalla Khedidja',
-    'Saïda',
-    'Youkous',
-    'Toudja',
-    'Messerghine',
-    'Mansoura',
+    'Ifri', 'Guedila', 'Saida', 'Lalla Khedidja',
+    'Youkous', 'Hayat', 'Mansourah', 'Texanna',
+    'Toudja', 'Messerghine',
 ];
+
+const BRAND_LOGOS: Record<string, any> = {
+    'Ifri':           require('../assets/brands/ifri.png'),
+    'Guedila':        require('../assets/brands/guedila.png'),
+    'Saida':          require('../assets/brands/saida.png'),
+    'Lalla Khedidja': require('../assets/brands/lalla-khedidja.png'),
+    'Youkous':        require('../assets/brands/youkous.png'),
+    'Hayat':          require('../assets/brands/hayat.jpg'),
+    'Mansourah':      require('../assets/brands/mansourah.png'),
+    'Texanna':        require('../assets/brands/texanna.png'),
+    'Toudja':         require('../assets/brands/toudja.png'),
+    'Messerghine':    require('../assets/brands/messerghine.png'),
+};
 
 // ─── Pricing ───────────────────────────────────────────────────────────────────
 const PRICES = {
@@ -53,14 +63,13 @@ export default function BottledWaterDetailsScreen() {
     const styles = getStyles(COLORS);
 
     const router = useRouter();
-    const insets = useSafeAreaInsets();
     const { t } = useTranslation();
     const params = useLocalSearchParams();
-    const { activeOrder, updateOrder } = useAppStore();
+    const { activeOrder, updateOrder, draftOrder, updateDraftOrder } = useAppStore();
 
     // ── Location state ────────────────────────────────────────────────────────
     const [finalAddress, setFinalAddress] = useState<string>(
-        (params.address as string) || 'Bouzouran, Batna'
+        draftOrder.location?.address || (params.address as string) || ''
     );
     const [showLocationError, setShowLocationError] = useState(false);
 
@@ -68,19 +77,37 @@ export default function BottledWaterDetailsScreen() {
         if (params.lockedAddress) {
             setFinalAddress(params.lockedAddress as string);
         }
-    }, [params.lockedAddress]);
+        if (params.lockedLat && params.lockedLng) {
+            updateDraftOrder({
+                location: {
+                    latitude: Number(params.lockedLat),
+                    longitude: Number(params.lockedLng),
+                    address: params.lockedAddress as string,
+                }
+            });
+        }
+    }, [params.lockedAddress, params.lockedLat, params.lockedLng]);
 
-    // ── Counters ──────────────────────────────────────────────────────────────
-    const [smallPacks, setSmallPacks] = useState(0);
-    const [mediumPacks, setMediumPacks] = useState(0);
-    const [largePacks, setLargePacks] = useState(0);
+    // ── Cart state (per-brand) ────────────────────────────────────────────────
+    const [cart, setCart] = useState<Record<string, { small: number, medium: number, large: number }>>(draftOrder.bottledWaterCart);
+
+    // Sync local cart to draft store on change
+    useEffect(() => {
+        updateDraftOrder({ bottledWaterCart: cart });
+    }, [cart]);
 
     // ── Brand selection ───────────────────────────────────────────────────────
     const [selectedBrand, setSelectedBrand] = useState('Guedila');
 
     // ── Dynamic price ─────────────────────────────────────────────────────────
-    const totalPrice =
-        smallPacks * PRICES.small + mediumPacks * PRICES.medium + largePacks * PRICES.large;
+    const totalPrice = Object.values(cart).reduce((acc, counts) => {
+        return acc + 
+            (counts.small * PRICES.small) + 
+            (counts.medium * PRICES.medium) + 
+            (counts.large * PRICES.large);
+    }, 0);
+
+    const currentBrandCart = cart[selectedBrand] || { small: 0, medium: 0, large: 0 };
 
     // ── Shake animation for location error ────────────────────────────────────
     const shakeAnim = useRef(new Animated.Value(0)).current;
@@ -97,23 +124,27 @@ export default function BottledWaterDetailsScreen() {
 
     // ── Handlers ──────────────────────────────────────────────────────────────
     const handleOrderNow = () => {
-        if (!params.lockedLat || !params.lockedLng) {
-            triggerShake();
-            return;
-        }
-        if (totalPrice === 0) {
-            // No items selected — shake without changing error text
-            triggerShake();
-            return;
-        }
+        const currentLat = params.lockedLat || draftOrder.location?.latitude;
+        const currentLng = params.lockedLng || draftOrder.location?.longitude;
 
-        // Build a human-readable quantity summary
-        const parts: string[] = [];
-        if (smallPacks > 0) parts.push(`${smallPacks}x 0.5L Pack`);
-        if (mediumPacks > 0) parts.push(`${mediumPacks}x 1.5L Pack`);
-        if (largePacks > 0) parts.push(`${largePacks}x 5L Jug`);
-        const quantitySummary = parts.join(', ');
-        const orderSummary = `Brand: ${selectedBrand} | ${quantitySummary}`;
+        if (!currentLat || !currentLng) {
+            triggerShake();
+            return;
+        }
+        // Build a human-readable quantity summary from the entire cart
+        const orderParts: string[] = [];
+        Object.entries(cart).forEach(([brand, counts]) => {
+            const brandParts: string[] = [];
+            if (counts.small > 0) brandParts.push(`${counts.small}x 0.5L`);
+            if (counts.medium > 0) brandParts.push(`${counts.medium}x 1.5L`);
+            if (counts.large > 0) brandParts.push(`${counts.large}x 5L`);
+            if (brandParts.length > 0) {
+                orderParts.push(`${brand}: ${brandParts.join(', ')}`);
+            }
+        });
+        
+        const quantitySummary = orderParts.join(' | ');
+        const orderSummary = quantitySummary;
 
         const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -125,18 +156,13 @@ export default function BottledWaterDetailsScreen() {
             status: 'searching',
             quantity: quantitySummary,
             price: totalPrice,
-            locationName: finalAddress || 'Selected Location',
+            locationName: finalAddress || 'Unknown Location',
             orderTime: currentTime,
             location: {
-                latitude: Number(params.lockedLat),
-                longitude: Number(params.lockedLng),
+                latitude: Number(currentLat),
+                longitude: Number(currentLng),
             },
-            bottledWaterItems: {
-                smallPacks,
-                mediumPacks,
-                largePacks,
-                brand: selectedBrand,
-            },
+            bottledWaterCart: cart,
             orderSummary,
         } as any);
 
@@ -153,24 +179,52 @@ export default function BottledWaterDetailsScreen() {
     };
 
     const handleSchedule = () => {
-        if (!params.lockedLat || !params.lockedLng) {
-            triggerShake();
+        const totalItems = Object.values(cart).reduce((sum, counts) => 
+            sum + counts.small + counts.medium + counts.large, 0
+        );
+
+        const currentLat = params.lockedLat || draftOrder.location?.latitude;
+
+        if (totalItems === 0 || !currentLat) {
+            Alert.alert(
+                t('Alert'),
+                'يرجى تحديد الكمية ومكان التوصيل أولاً قبل جدولة الطلب'
+            );
             return;
         }
-        router.push('/schedule-delivery' as any);
+        router.push('/schedule-delivery');
     };
 
-    // ── Counter helpers ───────────────────────────────────────────────────────
-    const clampInc = (setter: React.Dispatch<React.SetStateAction<number>>) =>
-        () => setter(v => v + 1);
-    const clampDec = (setter: React.Dispatch<React.SetStateAction<number>>) =>
-        () => setter(v => Math.max(0, v - 1));
+    // ── Cart update helper ────────────────────────────────────────────────────
+    const updateQuantity = (brand: string, size: 'small' | 'medium' | 'large', delta: number) => {
+        setCart(prev => {
+            const current = prev[brand] || { small: 0, medium: 0, large: 0 };
+            const nextValue = Math.max(0, current[size] + delta);
+            
+            // If all counts are zero, optionally clean up the brand key
+            if (nextValue === 0) {
+                const updatedBrand = { ...current, [size]: 0 };
+                if (updatedBrand.small === 0 && updatedBrand.medium === 0 && updatedBrand.large === 0) {
+                    const { [brand]: _, ...rest } = prev;
+                    return rest;
+                }
+            }
+
+            return {
+                ...prev,
+                [brand]: {
+                    ...current,
+                    [size]: nextValue
+                }
+            };
+        });
+    };
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             {/* ── Header ── */}
-            <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
+            <View style={[styles.header, { paddingTop: 20 }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={COLORS.navy} />
                 </TouchableOpacity>
@@ -215,11 +269,10 @@ export default function BottledWaterDetailsScreen() {
                                 <View style={styles.mapPinTail} />
                             </View>
                         </View>
-                        {/* Address row */}
                         <View style={styles.locationDetails}>
                             <Ionicons name="map-outline" size={18} color={COLORS.navy} style={{ marginRight: 10 }} />
                             <Text style={styles.locationTitle} numberOfLines={1}>
-                                {t('Delivery to:')} {finalAddress}
+                                {finalAddress ? `${t('Delivery to:')} ${finalAddress}` : t('Select delivery location')}
                             </Text>
                         </View>
                     </TouchableOpacity>
@@ -228,50 +281,7 @@ export default function BottledWaterDetailsScreen() {
                     )}
                 </Animated.View>
 
-                {/* ── 2. Select Size ── */}
-                <Text style={styles.sectionTitle}>{t('Select Size')}</Text>
-
-                <View style={styles.itemGrid}>
-                    {/* 0.5L Pack */}
-                    <ItemCard
-                        tint={ITEM_TINTS[0]}
-                        label={t('0.5L Pack')}
-                        sub={t('6 bottles')}
-                        price={`${PRICES.small} DA`}
-                        count={smallPacks}
-                        onInc={clampInc(setSmallPacks)}
-                        onDec={clampDec(setSmallPacks)}
-                        COLORS={COLORS}
-                        styles={styles}
-                    />
-                    {/* 1.5L Pack */}
-                    <ItemCard
-                        tint={ITEM_TINTS[1]}
-                        label={t('1.5L Pack')}
-                        sub={t('6 bottles')}
-                        price={`${PRICES.medium} DA`}
-                        count={mediumPacks}
-                        onInc={clampInc(setMediumPacks)}
-                        onDec={clampDec(setMediumPacks)}
-                        COLORS={COLORS}
-                        styles={styles}
-                    />
-                    {/* 5L Jug */}
-                    <ItemCard
-                        tint={ITEM_TINTS[2]}
-                        label={t('5L Jug')}
-                        sub={t('Single jug')}
-                        price={`${PRICES.large} DA`}
-                        count={largePacks}
-                        onInc={clampInc(setLargePacks)}
-                        onDec={clampDec(setLargePacks)}
-                        COLORS={COLORS}
-                        styles={styles}
-                        darkBg
-                    />
-                </View>
-
-                {/* ── 3. Choose Brand ── */}
+                {/* ── 2. Choose Brand ── */}
                 <Text style={styles.sectionTitle}>{t('Choose Brand')}</Text>
 
                 <ScrollView
@@ -281,32 +291,94 @@ export default function BottledWaterDetailsScreen() {
                 >
                     {BRANDS.map((brand) => {
                         const isSelected = selectedBrand === brand;
+                        const logo = BRAND_LOGOS[brand];
+                        // Total count for THIS brand specifically
+                        const brandCounts = cart[brand];
+                        const brandTotal = brandCounts 
+                            ? (brandCounts.small + brandCounts.medium + brandCounts.large) 
+                            : 0;
+
                         return (
                             <TouchableOpacity
                                 key={brand}
                                 style={[
-                                    styles.brandPill,
-                                    isSelected && styles.brandPillSelected,
+                                    styles.brandSquareCard,
+                                    isSelected && styles.brandSquareCardSelected,
                                 ]}
                                 onPress={() => setSelectedBrand(brand)}
                                 activeOpacity={0.8}
                             >
-                                <Text
-                                    style={[
-                                        styles.brandPillText,
-                                        isSelected && styles.brandPillTextSelected,
-                                    ]}
-                                >
-                                    {t(brand)}
-                                </Text>
+                                <View style={styles.brandLogoBox}>
+                                    <Image source={logo} style={styles.brandLogoMain} />
+                                </View>
+                                <Text style={styles.brandCardText}>{brand.toUpperCase()}</Text>
+
+                                {brandTotal > 0 && (
+                                    <View style={styles.brandBadge}>
+                                        <Text style={styles.brandBadgeText}>{brandTotal}</Text>
+                                    </View>
+                                )}
                             </TouchableOpacity>
                         );
                     })}
                 </ScrollView>
+
+                {/* ── 3. Select Size ── */}
+                <View style={styles.sizeHeader}>
+                    <Text style={styles.sectionTitle}>{t('Select Sizes for')} <Text style={{ color: COLORS.navy, fontStyle: 'italic' }}>{selectedBrand}</Text></Text>
+                </View>
+
+                <View style={styles.sizeList}>
+                    {/* 1.5L Pack */}
+                    <SizeRow
+                        thumbnailColor="#D69E2E" // Golden/Orange
+                        label={t('1.5L Pack')}
+                        sub={t('6 bottles')}
+                        price={PRICES.medium}
+                        count={currentBrandCart.medium}
+                        onInc={() => updateQuantity(selectedBrand, 'medium', 1)}
+                        onDec={() => updateQuantity(selectedBrand, 'medium', -1)}
+                        onSetCount={(n) => {
+                            setCart(prev => ({ ...prev, [selectedBrand]: { ...(prev[selectedBrand] || { small: 0, medium: 0, large: 0 }), medium: n } }));
+                        }}
+                        COLORS={COLORS}
+                        styles={styles}
+                    />
+                    {/* 0.5L Pack */}
+                    <SizeRow
+                        thumbnailColor="#F6AD55" // Light Orange
+                        label={t('0.5L Pack')}
+                        sub={t('6 bottles')}
+                        price={PRICES.small}
+                        count={currentBrandCart.small}
+                        onInc={() => updateQuantity(selectedBrand, 'small', 1)}
+                        onDec={() => updateQuantity(selectedBrand, 'small', -1)}
+                        onSetCount={(n) => {
+                            setCart(prev => ({ ...prev, [selectedBrand]: { ...(prev[selectedBrand] || { small: 0, medium: 0, large: 0 }), small: n } }));
+                        }}
+                        COLORS={COLORS}
+                        styles={styles}
+                    />
+                    {/* 5L Jug */}
+                    <SizeRow
+                        thumbnailColor="#718096" // Grayish Blue
+                        label={t('5L Jug')}
+                        sub={t('Single jug')}
+                        price={PRICES.large}
+                        count={currentBrandCart.large}
+                        onInc={() => updateQuantity(selectedBrand, 'large', 1)}
+                        onDec={() => updateQuantity(selectedBrand, 'large', -1)}
+                        onSetCount={(n) => {
+                            setCart(prev => ({ ...prev, [selectedBrand]: { ...(prev[selectedBrand] || { small: 0, medium: 0, large: 0 }), large: n } }));
+                        }}
+                        COLORS={COLORS}
+                        styles={styles}
+                    />
+                </View>
             </ScrollView>
 
             {/* ── Fixed Footer ── */}
-            <View style={[styles.fixedFooter, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+            <View style={[styles.fixedFooter, { paddingBottom: 20 }]}>
                 {/* Price row */}
                 <View style={styles.priceRow}>
                     <Text style={styles.priceLabel}>{t('TOTAL PRICE')}</Text>
@@ -319,54 +391,61 @@ export default function BottledWaterDetailsScreen() {
                 {/* Action buttons */}
                 <View style={styles.actionRow}>
                     <TouchableOpacity style={styles.btnSchedule} onPress={handleSchedule}>
-                        <Ionicons name="time-outline" size={18} color={COLORS.white} />
-                        <Text style={styles.btnScheduleText}>{t('Schedule')}</Text>
+                        <Text style={styles.btnScheduleText}>Schedule</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.btnOrder} onPress={handleOrderNow}>
-                        <Text style={styles.btnOrderText}>{t('Order Now')} 🛒</Text>
+                        <Text style={styles.btnOrderText}>Order Now</Text>
                     </TouchableOpacity>
                 </View>
             </View>
-        </View>
+        </SafeAreaView>
     );
 }
 
-// ─── Sub-component: ItemCard ────────────────────────────────────────────────────
-interface ItemCardProps {
-    tint: string;
+// ─── Sub-component: SizeRow ────────────────────────────────────────────────────
+interface SizeRowProps {
+    thumbnailColor: string;
     label: string;
     sub: string;
-    price: string;
+    price: number;
     count: number;
     onInc: () => void;
     onDec: () => void;
+    onSetCount: (n: number) => void;
     COLORS: any;
     styles: any;
-    darkBg?: boolean;
 }
 
-function ItemCard({ tint, label, sub, price, count, onInc, onDec, COLORS, styles, darkBg }: ItemCardProps) {
+function SizeRow({ thumbnailColor, label, sub, price, count, onInc, onDec, onSetCount, COLORS, styles }: SizeRowProps) {
     return (
-        <View style={styles.itemCard}>
-            {/* Image placeholder with brand tint */}
-            <View style={[styles.itemImageBox, { backgroundColor: tint }]}>
-                <Ionicons
-                    name="water"
-                    size={36}
-                    color={darkBg ? '#A8D8EA' : COLORS.navy}
-                />
-            </View>
+        <View style={styles.sizeRow}>
+            {/* Colored Thumbnail */}
+            <View style={[styles.sizeThumbnail, { backgroundColor: thumbnailColor }]} />
+
             {/* Info */}
-            <Text style={styles.itemLabel}>{label}</Text>
-            <Text style={styles.itemSub}>{sub}</Text>
-            <Text style={styles.itemPrice}>{price}</Text>
-            {/* Counter */}
-            <View style={styles.counterRow}>
-                <TouchableOpacity style={styles.counterBtn} onPress={onDec}>
+            <View style={styles.sizeInfo}>
+                <Text style={styles.sizeLabel}>{label}</Text>
+                <Text style={styles.sizeSub}>{sub}</Text>
+                <Text style={styles.sizePrice}>{price} DA</Text>
+            </View>
+
+            {/* Stepper */}
+            <View style={styles.stepperContainer}>
+                <TouchableOpacity style={styles.stepperBtn} onPress={onDec}>
                     <Ionicons name="remove" size={16} color={COLORS.navy} />
                 </TouchableOpacity>
-                <Text style={styles.counterValue}>{count}</Text>
-                <TouchableOpacity style={styles.counterBtn} onPress={onInc}>
+                <TextInput
+                    style={styles.stepperValue}
+                    keyboardType="numeric"
+                    value={String(count)}
+                    onChangeText={(text) => {
+                        const clean = text.replace(/[^0-9]/g, '');
+                        const num = parseInt(clean, 10);
+                        onSetCount(isNaN(num) ? 0 : num);
+                    }}
+                    selectTextOnFocus
+                />
+                <TouchableOpacity style={[styles.stepperBtn, { backgroundColor: COLORS.yellow }]} onPress={onInc}>
                     <Ionicons name="add" size={16} color={COLORS.navy} />
                 </TouchableOpacity>
             </View>
@@ -496,103 +575,145 @@ const getStyles = (COLORS: any) =>
             marginTop: 5,
             marginLeft: 6,
         },
-        // ── Item Grid (3 equal columns)
-        itemGrid: {
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            gap: 8,
+        // ── Brand square cards
+        brandScroll: {
+            paddingRight: 16,
+            paddingBottom: 10,
+            gap: 12,
         },
-        itemCard: {
-            flex: 1,
+        brandSquareCard: {
+            width: 100,
+            height: 110,
             backgroundColor: COLORS.white,
             borderRadius: 16,
             alignItems: 'center',
-            paddingVertical: 12,
-            paddingHorizontal: 4,
-            borderWidth: 1,
-            borderColor: COLORS.border,
+            justifyContent: 'center',
+            borderWidth: 2,
+            borderColor: 'transparent',
             shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.04,
-            shadowRadius: 6,
-            elevation: 2,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 4,
+            marginVertical: 4,
+            marginLeft: 2,
+            position: 'relative',
         },
-        itemImageBox: {
-            width: '100%',
-            height: 80,
-            borderRadius: 12,
+        brandSquareCardSelected: {
+            borderColor: COLORS.yellow,
+        },
+        brandLogoBox: {
+            width: 50,
+            height: 50,
+            borderRadius: 25,
+            backgroundColor: '#F0F4F8',
             justifyContent: 'center',
             alignItems: 'center',
             marginBottom: 8,
         },
-        itemLabel: {
-            fontSize: 12,
-            fontWeight: 'bold',
-            color: COLORS.navy,
-            textAlign: 'center',
-            marginBottom: 2,
+        brandLogoMain: {
+            width: 32,
+            height: 32,
+            resizeMode: 'contain',
         },
-        itemSub: {
+        brandCardText: {
             fontSize: 10,
-            color: COLORS.textGray,
+            fontWeight: '800',
+            color: '#94A3B8',
             textAlign: 'center',
-            marginBottom: 4,
         },
-        itemPrice: {
-            fontSize: 13,
-            fontWeight: 'bold',
-            color: '#E67E22',  // Orange accent for price — matches reference image
-            marginBottom: 10,
-        },
-        counterRow: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            borderWidth: 1,
-            borderColor: COLORS.border,
-            borderRadius: 20,
-            overflow: 'hidden',
-        },
-        counterBtn: {
-            width: 28,
-            height: 28,
+        brandBadge: {
+            position: 'absolute',
+            top: -6,
+            right: -6,
+            backgroundColor: COLORS.navy,
+            width: 20,
+            height: 20,
+            borderRadius: 10,
             justifyContent: 'center',
             alignItems: 'center',
-            backgroundColor: COLORS.bgGray,
+            borderWidth: 1.5,
+            borderColor: COLORS.white,
         },
-        counterValue: {
-            width: 28,
-            textAlign: 'center',
-            fontSize: 14,
+        brandBadgeText: {
+            color: COLORS.white,
+            fontSize: 10,
             fontWeight: 'bold',
+        },
+        // ── Size List Header
+        sizeHeader: {
+            marginTop: 24,
+            marginBottom: 10,
+        },
+        // ── Size List Rows
+        sizeList: {
+            gap: 12,
+        },
+        sizeRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: COLORS.white,
+            borderRadius: 12,
+            padding: 8,
+            marginBottom: 6,
+            borderWidth: 1,
+            borderColor: '#F1F5F9',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 6,
+            elevation: 2,
+        },
+        sizeThumbnail: {
+            width: 44,
+            height: 44,
+            borderRadius: 10,
+            marginRight: 12,
+        },
+        sizeInfo: {
+            flex: 1,
+            justifyContent: 'center',
+            paddingRight: 6,
+        },
+        sizeLabel: {
+            fontSize: 14,
+            fontWeight: '800',
             color: COLORS.navy,
         },
-        // ── Brand Pills scroll
-        brandScroll: {
-            paddingRight: 16,
-            paddingBottom: 4,
+        sizeSub: {
+            fontSize: 11,
+            color: '#94A3B8',
+            marginBottom: 2,
+        },
+        sizePrice: {
+            fontSize: 13,
+            fontWeight: 'bold',
+            color: '#E67E22',
+        },
+        stepperContainer: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#F1F5F9',
+            borderRadius: 16,
+            padding: 2,
+        },
+        stepperBtn: {
+            width: 24,
+            height: 24,
+            borderRadius: 12,
+            backgroundColor: COLORS.white,
+            justifyContent: 'center',
             alignItems: 'center',
         },
-        brandPill: {
-            paddingHorizontal: 20,
-            paddingVertical: 10,
-            borderRadius: 30,
-            borderWidth: 1.5,
-            borderColor: COLORS.border,
-            backgroundColor: COLORS.white,
-            marginRight: 10,
-        },
-        brandPillSelected: {
-            backgroundColor: COLORS.yellow,
-            borderColor: COLORS.yellow,
-        },
-        brandPillText: {
-            fontSize: 14,
-            fontWeight: '600',
+        stepperValue: {
+            fontSize: 13,
+            fontWeight: '900',
             color: COLORS.navy,
-        },
-        brandPillTextSelected: {
-            fontWeight: 'bold',
-            color: COLORS.navy,
+            paddingHorizontal: 2,
+            minWidth: 20,
+            textAlign: 'center',
+            padding: 0,
         },
         // ── Fixed Footer
         fixedFooter: {
@@ -605,10 +726,11 @@ const getStyles = (COLORS: any) =>
             borderTopColor: COLORS.border,
             paddingHorizontal: 20,
             paddingTop: 14,
+            paddingBottom: 20,
             shadowColor: '#000',
-            shadowOffset: { width: 0, height: -4 },
-            shadowOpacity: 0.06,
-            shadowRadius: 10,
+            shadowOffset: { width: 0, height: -6 },
+            shadowOpacity: 0.1,
+            shadowRadius: 12,
             elevation: 10,
         },
         priceRow: {
@@ -637,32 +759,37 @@ const getStyles = (COLORS: any) =>
             gap: 12,
         },
         btnSchedule: {
-            width: '35%',
-            backgroundColor: COLORS.navy,
-            borderRadius: 30,
-            paddingVertical: 14,
-            flexDirection: 'column',
+            flex: 1,
+            backgroundColor: 'transparent',
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: COLORS.navy,
             justifyContent: 'center',
             alignItems: 'center',
+            paddingVertical: 16,
         },
         btnScheduleText: {
-            color: COLORS.white,
-            fontSize: 12,
-            fontWeight: '600',
-            marginTop: 3,
+            color: COLORS.navy,
+            fontSize: 17,
+            fontWeight: 'bold',
         },
         btnOrder: {
             flex: 1,
             backgroundColor: COLORS.yellow,
-            borderRadius: 30,
+            borderRadius: 16,
             flexDirection: 'row',
             justifyContent: 'center',
             alignItems: 'center',
-            paddingVertical: 14,
+            paddingVertical: 16,
+            shadowColor: COLORS.yellow,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 4,
         },
         btnOrderText: {
-            color: '#003366',
-            fontSize: 16,
+            color: COLORS.navy,
+            fontSize: 17,
             fontWeight: 'bold',
         },
     });

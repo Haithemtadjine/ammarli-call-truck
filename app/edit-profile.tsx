@@ -26,7 +26,7 @@ export default function EditProfileScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { t } = useTranslation();
-    const { userProfile, updateUserName } = useAppStore();
+    const { userProfile, updateUserName, userRole } = useAppStore();
 
     // Form state
     const [name, setName] = useState(userProfile?.name || '');
@@ -37,12 +37,20 @@ export default function EditProfileScreen() {
     // Simplified Dropdown state for this UI
     const [showDropdown, setShowDropdown] = useState(false);
 
+    const handleGoBack = () => {
+        if (router.canGoBack()) {
+            router.back();
+        } else {
+            router.push('/(tabs)/profile');
+        }
+    };
+
     const handleSave = () => {
         updateUserName(name);
         Alert.alert(
             t('Success'),
             t('Profile Updated Successfully!'),
-            [{ text: 'OK', onPress: () => router.back() }]
+            [{ text: 'OK', onPress: () => handleGoBack() }]
         );
     };
 
@@ -53,7 +61,7 @@ export default function EditProfileScreen() {
         >
             {/* Dark Navy Header */}
             <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={COLORS.white} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>{t('Edit Profile')}</Text>
@@ -61,7 +69,7 @@ export default function EditProfileScreen() {
             </View>
 
             <ScrollView
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 24, 48) }]}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
             >
@@ -145,14 +153,15 @@ export default function EditProfileScreen() {
                     </View>
                 </View>
 
+                {/* Bottom Button attached to safe area bottom */}
+                <View style={styles.bottomContainer}>
+                    <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+                        <Text style={styles.saveButtonText}>{t('Save Changes')}</Text>
+                    </TouchableOpacity>
+                </View>
             </ScrollView>
 
-            {/* Bottom Button attached to safe area bottom */}
-            <View style={[styles.bottomContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-                <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-                    <Text style={styles.saveButtonText}>{t('Save Changes')}</Text>
-                </TouchableOpacity>
-            </View>
+
         </KeyboardAvoidingView>
     );
 }
@@ -199,9 +208,9 @@ const styles = StyleSheet.create({
         color: COLORS.white,
     },
     scrollContent: {
+        flexGrow: 1,
         paddingTop: 30,
         paddingHorizontal: 30,
-        paddingBottom: 40,
     },
     avatarSection: {
         alignItems: 'center',
@@ -298,7 +307,7 @@ const styles = StyleSheet.create({
         color: COLORS.textDark,
     },
     bottomContainer: {
-        paddingHorizontal: 30,
+        marginTop: 'auto',
         paddingTop: 10,
         backgroundColor: COLORS.white,
     },

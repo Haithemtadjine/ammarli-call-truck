@@ -10,14 +10,8 @@ export default function OnboardingScreen() {
     const insets = useSafeAreaInsets();
     const { t } = useTranslation();
 
-    const handleGetStarted = async () => {
-        try {
-            await AsyncStorage.setItem('hasLaunched', 'true');
-            router.push('/role-selection');
-        } catch (error) {
-            console.error('Error saving onboard state:', error);
-            router.push('/role-selection');
-        }
+    const handleGetStarted = () => {
+        router.push('/role-selection');
     };
 
     return (
@@ -29,7 +23,7 @@ export default function OnboardingScreen() {
                 {/* Logo Image Placeholder */}
                 <Image
                     // Using logo from assets, fallback logic usually is needed but this is a placeholder per prompt
-                    source={require('../assets/images/icon.png')}
+                    source={require('../assets/images/1.png')}
                     style={styles.logo}
                     resizeMode="contain"
                 />

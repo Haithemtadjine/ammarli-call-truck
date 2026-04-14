@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const COLORS = {
     navy: '#003366',
@@ -14,6 +15,7 @@ const COLORS = {
 
 export default function NoDriverFoundScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { t } = useTranslation();
 
     const handleBackHome = () => {
@@ -21,7 +23,7 @@ export default function NoDriverFoundScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 20) }]}>
             {/* Modal Container */}
             <View style={styles.modalCard}>
 

@@ -1,7 +1,7 @@
 import React, { forwardRef, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-export const PROVIDER_GOOGLE = null;
+
 
 // Only load leaflet on the client side
 let MapContainer: any, TileLayer: any, LeafletMarker: any, LeafletPolyline: any, useMap: any;
@@ -78,10 +78,43 @@ MapView.displayName = 'MapView';
 
 export const Marker = (props: any) => {
     if (typeof window === 'undefined' || !LeafletMarker) return null;
+    
+    const [icon, setIcon] = useState<any>(null);
+
+    useEffect(() => {
+        if (props.children) {
+            // Lazy load Leaflet and ReactDOMServer for web custom markers
+            const L = require('leaflet');
+            const ReactDOMServer = require('react-dom/server');
+            
+            try {
+                // Ensure icons are centered accurately on the geographic point
+                const htmlString = ReactDOMServer.renderToString(
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                        {props.children}
+                    </div>
+                );
+                
+                const customIcon = L.divIcon({
+                    html: htmlString,
+                    className: 'custom-rn-leaflet-marker',
+                    iconSize: [0, 0], // CSS dictates exact dimensions
+                    iconAnchor: [0, 0], // Center it relative to container
+                });
+                
+                setIcon(customIcon);
+            } catch (e) {
+                console.warn("Failed to render Marker children to divIcon:", e);
+            }
+        }
+    }, [props.children]);
+
+    // Apply icon only if successfully minted from children, else fallback to standard marker
     return (
-        <LeafletMarker position={[props.coordinate.latitude, props.coordinate.longitude]}>
-            {props.children}
-        </LeafletMarker>
+        <LeafletMarker 
+            position={[props.coordinate.latitude, props.coordinate.longitude]}
+            {...(icon ? { icon } : {})}
+        />
     );
 };
 
@@ -107,5 +140,8 @@ const styles = StyleSheet.create({
         zIndex: 0,
     },
 });
+
+// UrlTile is not needed on web — Leaflet's TileLayer is already baked into MapView above
+export const UrlTile = () => null;
 
 export default MapView;

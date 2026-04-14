@@ -7,11 +7,11 @@ import {
     Keyboard,
     KeyboardAvoidingView,
     Platform,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    TouchableWithoutFeedback,
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -64,7 +64,11 @@ export default function ResetPasswordScreen() {
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+            >
                 <View style={[styles.innerContainer, { paddingTop: Math.max(insets.top + 10, 40), paddingBottom: Math.max(insets.bottom + 20, 40) }]}>
 
                     {/* Header */}
@@ -153,7 +157,7 @@ export default function ResetPasswordScreen() {
                     </TouchableOpacity>
 
                 </View>
-            </TouchableWithoutFeedback>
+            </ScrollView>
         </KeyboardAvoidingView>
     );
 }
@@ -162,6 +166,9 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.white,
+    },
+    scrollContent: {
+        flexGrow: 1,
     },
     innerContainer: {
         flex: 1,
@@ -256,6 +263,7 @@ const styles = StyleSheet.create({
         marginLeft: 10,
     },
     actionButton: {
+        marginTop: 'auto',
         backgroundColor: COLORS.yellow,
         borderRadius: 30,
         paddingVertical: 18,

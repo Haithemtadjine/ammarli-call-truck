@@ -140,6 +140,7 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.yellow,
     },
     scrollContent: {
+        flexGrow: 1,
         padding: 20,
         paddingBottom: 40,
     },

@@ -1,11 +1,17 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+// ── Safe-render guard ──
+const isValidCoord = (r: any): boolean =>
+    !!r &&
+    typeof r.latitude === 'number' && isFinite(r.latitude) &&
+    typeof r.longitude === 'number' && isFinite(r.longitude);
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MapView, Marker, PROVIDER_GOOGLE } from '../components/MapComponent';
-import { customMapStyle } from '../constants/customMapStyle';
+import { MapView, Marker, UrlTile } from '../components/MapComponent';
 import { useAppStore } from '../src/store/useAppStore';
 
 const COLORS = {
@@ -31,16 +37,45 @@ export default function DriverArrivedScreen() {
         ? (activeOrder?.orderSummary || activeOrder?.quantity || 'Bottled Water')
         : (activeOrder?.waterType || activeOrder?.type || 'Water Delivery');
 
-    // Fallback location
-    const orderLat = activeOrder?.location?.latitude || 35.55597;
-    const orderLng = activeOrder?.location?.longitude || 6.17366;
+    // Fallback location — use ?? (nullish) not || so that lat === 0 (equator) isn't replaced
+    const orderLat = activeOrder?.location?.latitude ?? 35.55597;
+    const orderLng = activeOrder?.location?.longitude ?? 6.17366;
 
-    const [region] = useState({
-        latitude: orderLat,
-        longitude: orderLng,
+    const [region, setRegion] = useState({
+        latitude: Number(orderLat),
+        longitude: Number(orderLng),
         latitudeDelta: 0.002,
         longitudeDelta: 0.001,
     });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                let { status } = await Location.requestForegroundPermissionsAsync();
+                if (status !== 'granted') {
+                    setLoading(false);
+                    return;
+                }
+
+                let currentLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+                const lat = currentLocation.coords.latitude;
+                const lng = currentLocation.coords.longitude;
+
+                const newRegion = {
+                    latitude: lat,
+                    longitude: lng,
+                    latitudeDelta: 0.005,
+                    longitudeDelta: 0.005,
+                };
+                setRegion(newRegion);
+            } catch (error) {
+                console.warn(error);
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, []);
 
     const handlePhoneCall = () => {
         Linking.openURL(`tel:${driver?.phone || '0770000000'}`);
@@ -52,41 +87,74 @@ export default function DriverArrivedScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Map View */}
-            <MapView
-                ref={mapRef}
-                style={styles.map}
-                provider={PROVIDER_GOOGLE}
-                customMapStyle={customMapStyle}
-                initialRegion={region}
-                region={region}
-                showsUserLocation={false}
-                showsMyLocationButton={false}
-            >
-                {/* YOU Marker */}
-                <Marker coordinate={{ latitude: orderLat, longitude: orderLng }}>
-                    <View style={styles.markerGroup}>
-                        <View style={styles.homeMarker}>
-                            <Ionicons name="home" size={16} color={COLORS.white} />
+            {/* ── Native Map Guard: block mount until we have validated finite coordinates ── */}
+            {isValidCoord(region) ? (
+                <MapView
+                    ref={mapRef}
+                    style={styles.map}
+                    mapType="none"
+                    initialRegion={{
+                        latitude: Number(region.latitude),
+                        longitude: Number(region.longitude),
+                        latitudeDelta: Number(region.latitudeDelta) || 0.002,
+                        longitudeDelta: Number(region.longitudeDelta) || 0.001,
+                    }}
+                    region={{
+                        latitude: Number(region.latitude),
+                        longitude: Number(region.longitude),
+                        latitudeDelta: Number(region.latitudeDelta) || 0.002,
+                        longitudeDelta: Number(region.longitudeDelta) || 0.001,
+                    }}
+                    showsUserLocation={true}
+                    showsMyLocationButton={true}
+                >
+                    <UrlTile
+                        urlTemplate="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        maximumZ={19}
+                        flipY={false}
+                    />
+                    {/* YOU Marker */}
+                    <Marker coordinate={{
+                        latitude: Number(region.latitude),
+                        longitude: Number(region.longitude),
+                    }}>
+                        <View style={styles.markerGroup}>
+                            <View style={styles.homeMarker}>
+                                <Ionicons name="home" size={16} color={COLORS.white} />
+                            </View>
+                            <View style={styles.labelWrapper}>
+                                <Text style={styles.labelText}>{t('YOU')}</Text>
+                            </View>
                         </View>
-                        <View style={styles.labelWrapper}>
-                            <Text style={styles.labelText}>{t('YOU')}</Text>
-                        </View>
-                    </View>
-                </Marker>
+                    </Marker>
 
-                {/* DRIVER Marker */}
-                <Marker coordinate={{ latitude: orderLat + 0.0001, longitude: orderLng + 0.0001 }}>
-                    <View style={styles.markerGroup}>
-                        <View style={styles.truckMarker}>
-                            <Ionicons name="bus" size={18} color={COLORS.navy} />
+                    {/* DRIVER Marker — offset by a tiny delta so both markers are visible */}
+                    <Marker coordinate={{
+                        latitude: Number(region.latitude) + 0.0001,
+                        longitude: Number(region.longitude) + 0.0001,
+                    }}>
+                        <View style={styles.markerGroup}>
+                            <View style={styles.truckMarker}>
+                                <MaterialCommunityIcons name="truck" size={18} color={COLORS.navy} />
+                            </View>
+                            <View style={[styles.labelWrapper, { backgroundColor: COLORS.navy }]}>
+                                <Text style={[styles.labelText, { color: COLORS.white }]}>{t('DRIVER')}</Text>
+                            </View>
                         </View>
-                        <View style={[styles.labelWrapper, { backgroundColor: COLORS.navy }]}>
-                            <Text style={[styles.labelText, { color: COLORS.white }]}>{t('DRIVER')}</Text>
-                        </View>
-                    </View>
-                </Marker>
-            </MapView>
+                    </Marker>
+                </MapView>
+            ) : (
+                <View style={[styles.map, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#F0F4F8' }]}>
+                    <ActivityIndicator size="large" color={COLORS.navy} />
+                </View>
+            )}
+
+            {/* Loading Overlay */}
+            {loading && (
+                <View style={styles.loadingOverlay}>
+                    <ActivityIndicator size="large" color={COLORS.navy} />
+                </View>
+            )}
 
             {/* Back Button Overlay */}
             <TouchableOpacity
@@ -106,7 +174,7 @@ export default function DriverArrivedScreen() {
                     <Text style={styles.bannerText}>{t('THE DRIVER IS OUTSIDE!')}</Text>
                 </View>
 
-                <View style={styles.sheetContent}>
+                <View style={[styles.sheetContent, { paddingBottom: Math.max(insets.bottom + 20, 40) }]}>
                     {/* Main Instructions */}
                     <Text style={styles.mainInstructions}>
                         {isBottledWater
@@ -165,6 +233,13 @@ const styles = StyleSheet.create({
     },
     map: {
         flex: 1,
+    },
+    loadingOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 100,
     },
     backButton: {
         position: 'absolute',

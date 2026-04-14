@@ -1,10 +1,11 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Animated, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore } from '../src/store/useAppStore';
+import { MapView, Marker, UrlTile } from '../components/MapComponent';
 
 const COLORS = {
     navy: '#003366',
@@ -25,33 +26,31 @@ export default function TrackDeliveryScreen() {
     const locationName = activeOrder?.locationName || 'Batna';
     const driverPhone = driver?.phone || '0770000000';
 
-    // Animation: Truck moving horizontally
-    const truckAnim = useRef(new Animated.Value(0)).current;
+    // Animation: Truck moving geographically
+    const [truckCoord, setTruckCoord] = useState({ latitude: 35.548, longitude: 6.160 });
 
     useEffect(() => {
-        // Start truck movement animation
-        Animated.timing(truckAnim, {
-            toValue: 1,
-            duration: 8000, // 8 seconds for the demo
-            useNativeDriver: false, // Using width/positioning
-        }).start();
+        let step = 0;
+        const interval = setInterval(() => {
+            step++;
+            if (step > 60) clearInterval(interval);
+            setTruckCoord((prev: { latitude: number; longitude: number }) => ({
+                latitude: prev.latitude + (35.555 - 35.548) / 60,
+                longitude: prev.longitude + (6.173 - 6.160) / 60,
+            }));
+        }, 130);
 
         // Auto-transition to next screen
         const timer = setTimeout(() => {
             router.push('/driver-arrived' as any);
         }, 9000);
 
-        return () => clearTimeout(timer);
-    }, [router, truckAnim]);
+        return () => { clearTimeout(timer); clearInterval(interval); };
+    }, [router]);
 
     const handlePhoneCall = () => {
         Linking.openURL(`tel:${driverPhone}`);
     };
-
-    const truckLeft = truckAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0%', '75%'], // Stop before the house
-    });
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -70,23 +69,44 @@ export default function TrackDeliveryScreen() {
                     <Text style={styles.etaText}>{t('Arriving in 25 mins')}</Text>
                 </View>
 
-                {/* Animation Area */}
-                <View style={styles.animationArea}>
-                    <View style={styles.trackContainer}>
-                        <View style={styles.dashedLine} />
+                {/* ── MAP AREA ── */}
+                <View style={[styles.animationArea, { height: 180, paddingHorizontal: 0, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.borderLight }]}>
+    <MapView
+                        style={StyleSheet.absoluteFillObject}
+                        mapType="none"
+                        initialRegion={{
+                            latitude: 35.552,
+                            longitude: 6.169,
+                            latitudeDelta: 0.018,
+                            longitudeDelta: 0.018,
+                        }}
+                    >
+                        <UrlTile
+                            urlTemplate="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                            maximumZ={19}
+                            flipY={false}
+                        />
 
-                        {/* Animated Truck */}
-                        <Animated.View style={[styles.truckWrapper, { left: truckLeft }]}>
-                            <View style={styles.truckIconSquare}>
-                                <Ionicons name="bus" size={24} color={COLORS.navy} />
+                        {/* House Icon — explicit Number() cast guards against any future prop change */}
+                        <Marker coordinate={{
+                            latitude: Number(35.555),
+                            longitude: Number(6.173),
+                        }}>
+                            <View style={styles.houseIconSquare}>
+                                <Ionicons name="home" size={20} color={COLORS.white} />
                             </View>
-                        </Animated.View>
+                        </Marker>
 
-                        {/* House Icon */}
-                        <View style={styles.houseIconSquare}>
-                            <Ionicons name="home" size={24} color={COLORS.white} />
-                        </View>
-                    </View>
+                        {/* Animated Truck — Number() cast ensures incremented float never becomes NaN */}
+                        <Marker coordinate={{
+                            latitude: Number(truckCoord.latitude),
+                            longitude: Number(truckCoord.longitude),
+                        }}>
+                            <View style={styles.truckIconSquare}>
+                                <MaterialCommunityIcons name="truck" size={24} color={COLORS.navy} />
+                            </View>
+                        </Marker>
+                    </MapView>
                 </View>
 
                 {/* Main Text */}

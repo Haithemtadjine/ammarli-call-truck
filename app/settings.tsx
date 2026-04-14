@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { changeLanguage } from '../src/localization/i18n';
+import { useAppStore } from '../src/store/useAppStore';
 import { useTheme } from '../src/theme/ThemeContext';
 
 export default function SettingsScreen() {
@@ -160,7 +161,7 @@ export default function SettingsScreen() {
                                     text: t('Yes'),
                                     style: 'destructive',
                                     onPress: () => {
-                                        // TODO: Implement actual AsyncStorage clearing
+                                        useAppStore.getState().logout();
                                         router.replace('/login');
                                     }
                                 }

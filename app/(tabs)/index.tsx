@@ -1,24 +1,70 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import * as Location from 'expo-location';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import RatingModal from '../../components/RatingModal';
+import LocationPermissionModal from '../../src/components/LocationPermissionModal';
 import { useAppStore } from '../../src/store/useAppStore';
 import { useTheme } from '../../src/theme/ThemeContext';
+import { getGridColumns } from '../../src/utils/responsive';
+
+// ─── Responsive Service Grid Data ──────────────────────────────────────────────
+const WATER_SOURCES = [
+    { 
+        key: 'spring', 
+        labelKey: 'Spring Water', 
+        subtitleKey: 'Natural source',
+        image: require('../../assets/images/spring-water-icon.png'), 
+        type: 'Spring Water', 
+        route: '/tank-details',
+        bgColor: '#DDE9FA',
+    },
+    { 
+        key: 'well', 
+        labelKey: 'Well Water', 
+        subtitleKey: 'Deep extraction',
+        image: require('../../assets/images/well-water-icon.png'), 
+        type: 'Well Water', 
+        route: '/tank-details',
+        bgColor: '#FDE46D',
+    },
+    { 
+        key: 'ashghal', 
+        labelKey: 'Ashghal', 
+        subtitleKey: 'Municipal supply',
+        image: require('../../assets/images/ashghal-icon.png'), 
+        type: 'Ashghal', 
+        route: '/tank-details',
+        bgColor: '#DDE9FA',
+    },
+    { 
+        key: 'bottled', 
+        labelKey: 'Bottled Water', 
+        subtitleKey: 'Premium packs',
+        image: require('../../assets/images/bottled_icon.png'), 
+        type: 'Bottled Water', 
+        route: '/bottled-water-details',
+        bgColor: '#EAECEE',
+    },
+];
 
 export default function MainDashboardScreen() {
     const { colors } = useTheme();
+    // Custom navy override to match design precisely
     const COLORS = {
         ...colors,
-        navy: colors.textPrimary,
+        navy: '#001E3C', // Deep dark blue for texts
         white: '#FFFFFF',
-        yellow: colors.accent,
+        yellow: '#FFD700', // Yellow accent from mockup
         red: '#EF4444',
-        blueGradientStart: '#004080',
-        blueGradientEnd: '#002244',
+        blueGradientStart: '#002855', // Solid dark blue banner
+        blueGradientEnd: '#001E3C',
+        background: '#F8F9FA', // Off-white clean background (matches picture better)
+        grayText: '#6C757D',
     };
     const styles = getStyles(COLORS);
 
@@ -27,210 +73,215 @@ export default function MainDashboardScreen() {
     const { t } = useTranslation();
 
     // Zustand Data
-    const { userProfile, activeOrder, cancelOrder, updateOrder } = useAppStore();
+    const { userProfile, updateOrder, userRole, pastOrders: storePastOrders } = useAppStore();
     const userName = userProfile?.name || 'Guest';
-    const hasScheduledOrder = activeOrder !== null;
+
+    // Role-aware redirect guard
+    useEffect(() => {
+        if (userRole === 'DRIVER_TANKER') {
+            router.replace('/(driver)/tanker-dashboard');
+        } else if (userRole === 'DRIVER_BOTTLED') {
+            router.replace('/(driver)/driver-home');
+        }
+    }, [userRole]);
+
+    const [showLocationModal, setShowLocationModal] = useState(false);
+
+    useEffect(() => {
+        const checkLocationStatus = async () => {
+            try {
+                const { status } = await Location.getForegroundPermissionsAsync();
+                const gpsEnabled = await Location.hasServicesEnabledAsync();
+                
+                if (status === 'granted' && gpsEnabled) {
+                    setShowLocationModal(false);
+                } else {
+                    setShowLocationModal(true);
+                }
+            } catch (error) {
+                console.warn("Location check error:", error);
+                setShowLocationModal(true);
+            }
+        };
+        checkLocationStatus();
+    }, []);
+
+    const handleAllowLocation = async () => {
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status === 'granted') {
+                const gpsEnabled = await Location.hasServicesEnabledAsync();
+                if (gpsEnabled) {
+                    setShowLocationModal(false);
+                } else {
+                    alert(t('Please enable GPS services in your device settings.'));
+                }
+            }
+        } catch (error) {
+             console.warn(error);
+        }
+    };
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             <RatingModal />
+            <LocationPermissionModal 
+                visible={showLocationModal} 
+                onClose={() => setShowLocationModal(false)} 
+                onAllow={handleAllowLocation} 
+            />
+            
+            {/* Header Sequence */}
+            <View style={styles.headerRow}>
+                <View style={styles.userInfo}>
+                    <View style={styles.avatarPlaceholder}>
+                        <MaterialCommunityIcons name="face-man" size={28} color="#8D6242" />
+                    </View>
+                    <View>
+                        <Text style={styles.welcomeText}>WELCOME</Text>
+                        <Text style={styles.greetingText}>Hello, {userName}</Text>
+                    </View>
+                </View>
+                <TouchableOpacity
+                    style={styles.bellButton}
+                    onPress={() => router.push('/notifications')}
+                >
+                    <Ionicons name="notifications" size={24} color={COLORS.navy} />
+                </TouchableOpacity>
+            </View>
+
             <ScrollView
-                contentContainerStyle={{ paddingTop: Math.max(insets.top, 20), paddingBottom: 100 }}
+                contentContainerStyle={{ paddingBottom: 80 }}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Header Sequence */}
-                <View style={styles.headerRow}>
-                    <View style={styles.userInfo}>
-                        <View style={styles.avatarPlaceholder}>
-                            <Text style={styles.avatarText}>{userName.charAt(0)}</Text>
-                        </View>
-                        <View>
-                            <Text style={styles.greetingText}>{t('Hello')}, {userName} 👋</Text>
-                            <Text style={styles.subGreetingText}>{t('Ready for a refill?')}</Text>
-                        </View>
-                    </View>
-                    <TouchableOpacity
-                        style={styles.bellButton}
-                        onPress={() => router.push('/notifications')}
+                {/* Full-width Hero Banner container with horizontal padding */}
+                <View style={{ paddingHorizontal: 16 }}>
+                    <LinearGradient
+                        colors={[COLORS.blueGradientStart, COLORS.blueGradientEnd]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.heroBanner}
                     >
-                        <Ionicons name="notifications" size={24} color={COLORS.navy} />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Scheduled Reminder Pill (Moved Above Hero Banner) */}
-                {hasScheduledOrder && (
-                    <View style={styles.reminderPill}>
-                        <View style={styles.reminderIconBox}>
-                            <Ionicons name="calendar-outline" size={22} color={COLORS.navy} />
+                        <View style={styles.heroContent}>
+                            <Text style={styles.heroTitle}>{t('Pure Water,\nDelivered Fast')}</Text>
+                            <TouchableOpacity
+                                style={styles.orderNowBtn}
+                                onPress={() => router.push('/tank-details')}
+                            >
+                                <Text style={styles.orderNowText}>{t('Order Now')}</Text>
+                            </TouchableOpacity>
                         </View>
-                        <Text style={styles.reminderText}>
-                            {t('Reminder:')} 3000L{'\n'}{t('Delivery for')}{'\n'}{t('Tomorrow at')} 10:00{'\n'}AM
-                        </Text>
-                        <TouchableOpacity style={styles.actionBtnCancel} onPress={cancelOrder}>
-                            <Text style={styles.cancelText}>{t('Cancel')}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.actionBtnEdit}
-                            onPress={() => {
-                                // Placeholder for backend update logic
-                                updateOrder({ ...activeOrder!, status: 'updated' });
-                                router.push('/tank-details');
-                            }}
-                        >
-                            <Ionicons name="pencil" size={12} color={COLORS.navy} style={{ marginRight: 4 }} />
-                            <Text style={styles.editText}>{t('Edit')}</Text>
+                    </LinearGradient>
+
+                    {/* Selection Section Header */}
+                    <View style={styles.sectionHeaderRow}>
+                        <Text style={styles.sectionTitle}>{t('Select Water Source')}</Text>
+                        <TouchableOpacity>
+                            <Text style={styles.seeAllText}>{t('See all')}</Text>
                         </TouchableOpacity>
                     </View>
-                )}
 
-                {/* Hero Banner */}
-                <LinearGradient
-                    colors={[COLORS.blueGradientStart, COLORS.blueGradientEnd]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.heroBanner}
-                >
-                    <View style={styles.heroContent}>
-                        <Text style={styles.heroTitle}>{t('Pure Water,\nDelivered Fast. 💧')}</Text>
-                        <TouchableOpacity
-                            style={styles.orderNowBtn}
-                            onPress={() => router.push('/tank-details')}
-                        >
-                            <Text style={styles.orderNowText}>{t('Order Now')}</Text>
-                        </TouchableOpacity>
+                    {/* Responsive Water Source Grid */}
+                    <WaterSourceGrid router={router} updateOrder={updateOrder} t={t} styles={styles} />
+
+                    {/* Recent Orders Section Header */}
+                    <View style={[styles.sectionHeaderRow, { marginTop: 8 }]}>
+                        <Text style={styles.sectionTitle}>{t('Recent Orders')}</Text>
                     </View>
-                    <Ionicons name="water" size={120} color="rgba(255,255,255,0.05)" style={styles.heroBgIcon} />
-                </LinearGradient>
 
-                {/* Selection Section */}
-                <Text style={styles.sectionTitle}>{t('Select Water Source')}</Text>
-
-                {/* 2x2 Grid */}
-                <View style={styles.gridContainer}>
-                    <View style={styles.gridRow}>
-                        <ServiceCard
-                            title={t('Spring Water')}
-                            customImage={require('../../assets/images/spring-water-icon.png')}
-                            onPress={() => {
-                                updateOrder({ id: Date.now(), type: 'Spring Water', waterType: 'Spring Water', status: 'pending' });
-                                router.push('/tank-details');
-                            }}
-                        />
-                        <ServiceCard
-                            title={t('Well Water')}
-                            customImage={require('../../assets/images/well-water-icon.png')}
-                            onPress={() => {
-                                updateOrder({ id: Date.now(), type: 'Well Water', waterType: 'Well Water', status: 'pending' });
-                                router.push('/tank-details');
-                            }}
-                        />
-                    </View>
-                    <View style={styles.gridRow}>
-                        <ServiceCard
-                            title={t('Ashghal')}
-                            customImage={require('../../assets/images/ashghal-icon.png')}
-                            onPress={() => {
-                                updateOrder({ id: Date.now(), type: 'Ashghal', waterType: 'Ashghal', status: 'pending' });
-                                router.push('/tank-details');
-                            }}
-                        />
-                        <ServiceCard
-                            title={t('Bottled Water')}
-                            icon="water-outline"
-                            iconFamily="Ionicons"
-                            onPress={() => {
-                                updateOrder({ id: Date.now(), type: 'Bottled Water', waterType: 'Bottled Water', status: 'pending' });
-                                router.push('/bottled-water-details' as any);
-                            }}
-                        />
+                    {/* Vertical List of Recent Orders */}
+                    <View style={styles.recentOrdersList}>
+                        {storePastOrders.length > 0 ? (
+                            storePastOrders.slice().reverse().slice(0, 3).map((order: any, idx) => (
+                                <RecentOrderCard
+                                    key={`order-${order.id}-${idx}`}
+                                    title={t(order.waterType || 'Water Delivery')}
+                                    volume={order.quantity || 'Bulk'}
+                                    date={order.schedulingInfo ? `${t('Scheduled for')} ${order.schedulingInfo.date}` : (order.orderTime || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))}
+                                    status={(order.status || 'COMPLETED').toUpperCase()}
+                                    styles={styles}
+                                />
+                            ))
+                        ) : (
+                            <Text style={{ textAlign: 'center', color: COLORS.grayText, marginVertical: 20 }}>
+                                {t('No recent orders found.')}
+                            </Text>
+                        )}
                     </View>
                 </View>
-
-                {/* Recent Orders Section */}
-                <View style={styles.sectionHeaderRow}>
-                    <Text style={styles.sectionTitle}>{t('Recent Orders')}</Text>
-                    <TouchableOpacity>
-                        <Text style={styles.seeAllText}>{t('See All')}</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentOrdersScroll}>
-                    <View style={styles.recentOrderCard}>
-                        <View style={styles.recentOrderIcon}>
-                            <MaterialCommunityIcons name="history" size={20} color={COLORS.navy} />
-                        </View>
-                        <View style={styles.recentOrderInfo}>
-                            <Text style={styles.recentOrderTitle}>{t('5000L Well Water')}</Text>
-                            <Text style={styles.recentOrderDate}>{t('2 days ago')}</Text>
-                        </View>
-                        <TouchableOpacity style={styles.reorderBtn}>
-                            <Ionicons name="refresh" size={16} color={COLORS.navy} />
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.recentOrderCard}>
-                        <View style={styles.recentOrderIcon}>
-                            <MaterialCommunityIcons name="history" size={20} color={COLORS.navy} />
-                        </View>
-                        <View style={styles.recentOrderInfo}>
-                            <Text style={styles.recentOrderTitle}>{t('3000L Spring Water')}</Text>
-                            <Text style={styles.recentOrderDate}>{t('1 week ago')}</Text>
-                        </View>
-                        <TouchableOpacity style={styles.reorderBtn}>
-                            <Ionicons name="refresh" size={16} color={COLORS.navy} />
-                        </TouchableOpacity>
-                    </View>
-                </ScrollView>
-
             </ScrollView>
+        </SafeAreaView>
+    );
+}
+
+// ─── Utility Components ────────────────────────────────────────────────────────
+
+function WaterSourceGrid({ router, updateOrder, t, styles }: any) {
+    const cols = getGridColumns();
+    const rows: (typeof WATER_SOURCES[number])[][] = [];
+    for (let i = 0; i < WATER_SOURCES.length; i += cols) {
+        rows.push(WATER_SOURCES.slice(i, i + cols));
+    }
+    return (
+        <View style={styles.gridContainer}>
+            {rows.map((row, ri) => (
+                <View key={ri} style={styles.gridRow}>
+                    {row.map((item) => (
+                        <ServiceCard
+                            key={item.key}
+                            title={t(item.labelKey)}
+                            subtitle={t(item.subtitleKey)}
+                            image={item.image}
+                            bgColor={item.bgColor}
+                            styles={styles}
+                            onPress={() => {
+                                updateOrder({ id: Date.now(), type: item.type, waterType: item.type, status: 'pending' });
+                                router.push(item.route as any);
+                            }}
+                        />
+                    ))}
+                    {row.length < cols && Array.from({ length: cols - row.length }).map((_, pi) => (
+                        <View key={`pad-${pi}`} style={{ flex: 1, marginHorizontal: 6 }} />
+                    ))}
+                </View>
+            ))}
         </View>
     );
 }
 
-function ServiceCard({ title, icon, iconFamily, customImage, onPress }: any) {
-    const { colors } = useTheme();
-    const COLORS = {
-        ...colors,
-        navy: colors.textPrimary,
-        white: '#FFFFFF',
-        yellow: colors.accent,
-        red: '#EF4444',
-        blueGradientStart: '#004080',
-        blueGradientEnd: '#002244',
-    };
-    const styles = getStyles(COLORS);
-    const IconComponent: any = iconFamily === 'Ionicons' ? Ionicons : MaterialCommunityIcons;
-
-    if (customImage) {
-        return (
-            <TouchableOpacity style={[styles.serviceCard, { paddingVertical: 15 }]} onPress={onPress} activeOpacity={0.8}>
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-                    <Image
-                        source={customImage}
-                        style={{ width: 60, height: 60, marginBottom: 12 }}
-                        resizeMode="contain"
-                    />
-                </View>
-                <Text style={styles.serviceTitle}>{title}</Text>
-            </TouchableOpacity>
-        );
-    }
-
+function ServiceCard({ title, subtitle, image, bgColor, styles, onPress }: any) {
     return (
         <TouchableOpacity style={styles.serviceCard} onPress={onPress} activeOpacity={0.8}>
-            <View style={styles.iconCircleBg}>
-                <LinearGradient
-                    colors={['#4facfe', '#00f2fe']}
-                    style={styles.iconGradient}
-                >
-                    <IconComponent name={icon} size={28} color={'#FFFFFF'} />
-                    {/* Tiny yellow sparkle accent component matching the design */}
-                    <View style={styles.sparkleAccent} />
-                </LinearGradient>
+            <View style={[styles.iconBox, { backgroundColor: bgColor }]}>
+                <Image source={image} style={{ width: 38, height: 38 }} resizeMode="contain" />
             </View>
             <Text style={styles.serviceTitle}>{title}</Text>
+            <Text style={styles.serviceSubtitle}>{subtitle}</Text>
         </TouchableOpacity>
     );
 }
+
+function RecentOrderCard({ title, volume, date, status, styles }: any) {
+    return (
+        <View style={styles.recentOrderCard}>
+            <View style={styles.recentOrderIconContainer}>
+                <MaterialCommunityIcons name="truck-delivery-outline" size={24} color="#001E3C" />
+            </View>
+            <View style={styles.recentOrderInfo}>
+                <Text style={styles.recentOrderTitle}>{title}</Text>
+                <Text style={styles.recentOrderDate}>{date}</Text>
+            </View>
+            <View style={styles.recentOrderRight}>
+                <Text style={styles.recentOrderVolume}>{volume}</Text>
+                <View style={styles.completedBadge}>
+                    <Text style={styles.completedBadgeText}>{status}</Text>
+                </View>
+            </View>
+        </View>
+    );
+}
+
+// ─── Stylesheet ──────────────────────────────────────────────────────────────
 
 const getStyles = (COLORS: any) => StyleSheet.create({
     container: {
@@ -241,252 +292,183 @@ const getStyles = (COLORS: any) => StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
         marginBottom: 20,
+        marginTop: 8,
     },
     userInfo: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     avatarPlaceholder: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: '#E6A88F',
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#F5E6E0', // Light peach background as mock
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
     },
-    avatarText: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#FFFFFF',
+    welcomeText: {
+        fontSize: 10,
+        color: COLORS.grayText,
+        fontWeight: '600',
+        letterSpacing: 0.8,
+        marginBottom: 2,
     },
     greetingText: {
         fontSize: 18,
-        fontWeight: 'bold',
-        color: COLORS.textPrimary,
-    },
-    subGreetingText: {
-        fontSize: 13,
-        color: COLORS.textSecondary,
-        marginTop: 2,
+        fontWeight: '800',
+        color: COLORS.navy,
     },
     bellButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: COLORS.surface,
+        padding: 8,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 5,
-        elevation: 2,
     },
     heroBanner: {
-        marginHorizontal: 20,
+        width: '100%',
+        paddingVertical: 24,
+        paddingHorizontal: 20,
         borderRadius: 24,
-        padding: 24,
         overflow: 'hidden',
-        position: 'relative',
-        marginBottom: 20,
+        marginBottom: 24,
     },
     heroContent: {
         zIndex: 2,
     },
     heroTitle: {
-        fontSize: 24,
+        fontSize: 26,
         fontWeight: 'bold',
-        color: '#FFFFFF', // Heroes usually stay white even in dark mode for contrast over gradients
-        lineHeight: 32,
-        marginBottom: 20,
+        color: '#FFFFFF',
+        lineHeight: 34,
+        marginBottom: 16,
     },
     orderNowBtn: {
-        backgroundColor: COLORS.accent,
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 20,
+        backgroundColor: COLORS.yellow,
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 24,
         alignSelf: 'flex-start',
     },
     orderNowText: {
-        color: '#003366', // Keep explicitly navy for the yellow button contrast
+        color: '#001E3C', // Deep dark blue
         fontWeight: 'bold',
-        fontSize: 14,
-    },
-    heroBgIcon: {
-        position: 'absolute',
-        right: -20,
-        bottom: -30,
-        zIndex: 1,
-    },
-    reminderPill: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.iconContainer,
-        marginHorizontal: 20,
-        padding: 16,
-        paddingVertical: 18,
-        borderRadius: 40,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-    },
-    reminderIconBox: {
-        marginRight: 10,
-    },
-    reminderText: {
-        flex: 1,
-        fontSize: 13,
-        fontWeight: 'bold',
-        color: COLORS.textPrimary,
-        lineHeight: 18,
-    },
-    actionBtnCancel: {
-        paddingHorizontal: 8,
-        marginRight: 8,
-    },
-    cancelText: {
-        color: '#EF4444',
-        fontWeight: 'bold',
-        fontSize: 12,
-    },
-    actionBtnEdit: {
-        flexDirection: 'row',
-        backgroundColor: COLORS.surface,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 20,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: COLORS.border,
-    },
-    editText: {
-        color: COLORS.textPrimary,
-        fontWeight: 'bold',
-        fontSize: 12,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: COLORS.textPrimary,
-        marginHorizontal: 20,
-        marginBottom: 15,
-    },
-    gridContainer: {
-        paddingHorizontal: 15,
-        marginBottom: 25,
-    },
-    gridRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 10,
-    },
-    serviceCard: {
-        flex: 1,
-        backgroundColor: COLORS.surface,
-        borderRadius: 20,
-        paddingVertical: 25,
-        alignItems: 'center',
-        marginHorizontal: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 3,
-    },
-    iconCircleBg: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#F0F8FF', // Light blue background behind gradient
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    iconGradient: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        justifyContent: 'center',
-        alignItems: 'center',
-        position: 'relative',
-    },
-    sparkleAccent: {
-        position: 'absolute',
-        top: 2,
-        right: 2,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: COLORS.accent,
-        borderWidth: 1,
-        borderColor: COLORS.surface,
-        borderStyle: 'solid',
-    },
-    serviceTitle: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: COLORS.textPrimary,
+        fontSize: 15,
     },
     sectionHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingRight: 20,
-        marginBottom: 15,
+        marginBottom: 16,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: COLORS.navy,
     },
     seeAllText: {
-        color: COLORS.textSecondary,
-        fontWeight: '600',
+        color: COLORS.grayText,
         fontSize: 14,
+        fontWeight: '500',
     },
-    recentOrdersScroll: {
-        paddingHorizontal: 20,
+    gridContainer: {
+        marginBottom: 16,
+    },
+    gridRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+    },
+    serviceCard: {
+        flex: 1,
+        backgroundColor: COLORS.white,
+        borderRadius: 24,
+        padding: 20,
+        alignItems: 'flex-start',
+        marginHorizontal: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 5,
+        elevation: 2,
+    },
+    iconBox: {
+        width: 56,
+        height: 56,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    serviceTitle: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: COLORS.navy,
+        marginBottom: 4,
+    },
+    serviceSubtitle: {
+        fontSize: 12,
+        color: COLORS.grayText,
+    },
+    recentOrdersList: {
+        marginTop: 4,
     },
     recentOrderCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.surface,
+        backgroundColor: COLORS.white,
         padding: 16,
         borderRadius: 20,
-        marginRight: 15,
-        minWidth: 260,
+        marginBottom: 16,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
+        shadowOpacity: 0.04,
+        shadowRadius: 5,
         elevation: 2,
     },
-    recentOrderIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: COLORS.iconContainer,
+    recentOrderIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 16,
+        backgroundColor: '#F5F7FA', // Matches mockup gray
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
-    },
-    recentOrderTitle: {
-        fontWeight: 'bold',
-        color: COLORS.textPrimary,
-        fontSize: 14,
-        marginBottom: 4,
+        marginRight: 16,
     },
     recentOrderInfo: {
         flex: 1,
+        justifyContent: 'center',
+    },
+    recentOrderTitle: {
+        fontWeight: 'bold',
+        color: COLORS.navy,
+        fontSize: 15,
+        marginBottom: 4,
     },
     recentOrderDate: {
-        color: COLORS.textSecondary,
+        color: COLORS.grayText,
         fontSize: 12,
     },
-    reorderBtn: {
-        backgroundColor: COLORS.accent,
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+    recentOrderRight: {
+        alignItems: 'flex-end',
         justifyContent: 'center',
-        alignItems: 'center',
-    }
+    },
+    recentOrderVolume: {
+        fontWeight: 'bold',
+        fontSize: 15,
+        color: COLORS.navy,
+        marginBottom: 8,
+    },
+    completedBadge: {
+        backgroundColor: '#D1FADF',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+    },
+    completedBadgeText: {
+        color: '#027A48',
+        fontSize: 10,
+        fontWeight: 'bold',
+    },
 });

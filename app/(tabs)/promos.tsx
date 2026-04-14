@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/theme/ThemeContext';
 
 export default function PromosScreen() {
@@ -19,8 +19,6 @@ export default function PromosScreen() {
         background: colors.background,
     };
     const styles = getStyles(COLORS);
-    const insets = useSafeAreaInsets();
-    const paddingTopWithSafeArea = Math.max(insets.top + 20, 40);
     const { t } = useTranslation();
 
     const [promoCode, setPromoCode] = useState('');
@@ -47,10 +45,11 @@ export default function PromosScreen() {
     ];
 
     return (
-        <ScrollView
-            style={styles.container}
-            contentContainerStyle={[styles.contentContainer, { paddingTop: paddingTopWithSafeArea }]}
-        >
+        <SafeAreaView style={styles.container}>
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={[styles.contentContainer, { paddingTop: 20 }]}
+            >
             {/* Header */}
             <Text style={styles.screenTitle}>{t('Promotions')}</Text>
 
@@ -102,7 +101,8 @@ export default function PromosScreen() {
                     </View>
                 ))}
             </View>
-        </ScrollView>
+            </ScrollView>
+        </SafeAreaView>
     );
 }
 

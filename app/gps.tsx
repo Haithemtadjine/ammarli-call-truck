@@ -3,7 +3,8 @@ import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function GPSScreen() {
     const router = useRouter();
@@ -134,7 +135,7 @@ const styles = StyleSheet.create({
     },
     buttonContainer: {
         paddingHorizontal: 20,
-        paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+        paddingBottom: 20,
     },
     actionButton: {
         backgroundColor: '#FACC15',

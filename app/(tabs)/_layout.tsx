@@ -2,35 +2,52 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { isTablet, MAX_CONTENT_WIDTH } from '../../src/utils/responsive';
 import { useTheme } from '../../src/theme/ThemeContext';
 
 export default function TabLayout() {
     const { t } = useTranslation();
     const { colors } = useTheme();
+    const insets = useSafeAreaInsets();
+
+    // Compute safe tab bar sizing.
+    // - TAB_CONTENT_HEIGHT: visible icon + label area
+    // - bottomInset: gesture nav bar or home indicator
+    const TAB_CONTENT_HEIGHT = 56;
+    const bottomInset = insets.bottom;
+    const tabBarHeight = TAB_CONTENT_HEIGHT + bottomInset;
 
     return (
         <Tabs
             screenOptions={{
                 headerShown: false,
-                tabBarActiveTintColor: colors.accent, // Yellow in both modes or Yellow in dark
+                tabBarActiveTintColor: colors.accent,
                 tabBarInactiveTintColor: colors.textSecondary,
                 tabBarStyle: {
                     backgroundColor: colors.surface,
                     borderTopWidth: 1,
                     borderTopColor: colors.border,
-                    height: Platform.OS === 'ios' ? 88 : 68,
-                    paddingBottom: Platform.OS === 'ios' ? 28 : 10,
-                    paddingTop: 10,
-                    elevation: 10,
+                    height: tabBarHeight,
+                    paddingBottom: bottomInset + 4,
+                    paddingTop: 8,
+                    elevation: 12,
                     shadowColor: '#000',
-                    shadowOffset: { width: 0, height: -2 },
-                    shadowOpacity: 0.05,
-                    shadowRadius: 10,
+                    shadowOffset: { width: 0, height: -3 },
+                    shadowOpacity: 0.08,
+                    shadowRadius: 12,
+                    // Tablet: constrain width so icons don't drift to screen edges
+                    ...(isTablet && {
+                        maxWidth: MAX_CONTENT_WIDTH,
+                        alignSelf: 'center' as const,
+                        width: '100%',
+                        borderRadius: 0,
+                    }),
                 },
                 tabBarLabelStyle: {
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: '600',
-                    marginTop: 4,
+                    marginTop: 1,
                 },
             }}>
             <Tabs.Screen

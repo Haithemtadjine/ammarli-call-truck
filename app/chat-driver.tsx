@@ -59,11 +59,15 @@ export default function ChatDriverScreen() {
 
     // Auto-scroll to bottom when messages change
     useEffect(() => {
+        let timeout: any;
         if (messages.length > 0) {
-            setTimeout(() => {
+            timeout = setTimeout(() => {
                 flatListRef.current?.scrollToEnd({ animated: true });
             }, 100);
         }
+        return () => {
+            if (timeout) clearTimeout(timeout);
+        };
     }, [messages]);
 
     useEffect(() => {
@@ -162,7 +166,8 @@ export default function ChatDriverScreen() {
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
             {/* Custom Header */}
             <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>

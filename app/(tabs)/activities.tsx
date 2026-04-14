@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAppStore } from '../../src/store/useAppStore';
 import { useTheme } from '../../src/theme/ThemeContext';
 
 export default function ActivitiesScreen() {
@@ -19,47 +20,35 @@ export default function ActivitiesScreen() {
         background: colors.background,
     };
     const styles = getStyles(COLORS);
-    const insets = useSafeAreaInsets();
-    const paddingTopWithSafeArea = Math.max(insets.top + 20, 60);
     const { t } = useTranslation();
 
     const [activeTab, setActiveTab] = useState('Past');
+    const { setPendingRating, pastOrders: storePastOrders } = useAppStore();
 
-    const pastOrders = [
-        {
-            id: '1',
-            type: t('Spring Water - 50L'),
-            date: t('Oct 12, 10:30 AM'),
-            price: '$45.00'
-        },
-        {
-            id: '2',
-            type: t('Purified Water - 100L'),
-            date: t('Sep 28, 2:15 PM'),
-            price: '$85.00'
-        },
-        {
-            id: '3',
-            type: t('Spring Water - 20L'),
-            date: t('Sep 15, 9:00 AM'),
-            price: '$20.00'
-        },
-        {
-            id: '4',
-            type: t('Alkaline Water - 50L'),
-            date: t('Aug 30, 11:45 AM'),
-            price: '$55.00'
-        }
-    ];
+    const pastOrders = storePastOrders
+        .filter(o => o.status !== 'scheduled')
+        .map(o => ({
+            id: String(o.id),
+            type: o.waterType ? `${t(o.waterType)} - ${o.quantity || 'Bulk'}` : t('Water Delivery'),
+            date: o.orderTime || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            price: o.price ? `${o.price} DA` : t('Paid'),
+        })).reverse();
 
-    const upcomingOrders: any[] = [];
+    const upcomingOrders = storePastOrders
+        .filter(o => o.status === 'scheduled')
+        .map(o => ({
+            id: String(o.id),
+            type: o.waterType ? `${t(o.waterType)} - ${o.quantity || 'Bulk'}` : t('Water Delivery'),
+            date: o.schedulingInfo ? `${o.schedulingInfo.date} ${o.schedulingInfo.time}` : t('Scheduled'),
+            price: o.price ? `${o.price} DA` : t('Pending'),
+        })).reverse();
 
     const displayOrders = activeTab === 'Past' ? pastOrders : upcomingOrders;
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             {/* Main Header Area */}
-            <View style={[styles.headerContainer, { paddingTop: paddingTopWithSafeArea }]}>
+            <View style={[styles.headerContainer, { paddingTop: 20 }]}>
                 <Text style={styles.headerTitle}>{t('My Activities')}</Text>
 
                 {/* Custom Tab Switcher */}
@@ -110,6 +99,13 @@ export default function ActivitiesScreen() {
 
                             {/* Right: Pill Button */}
                             <View style={styles.cardRight}>
+                                <TouchableOpacity 
+                                    style={[styles.reorderButton, { marginBottom: 8, backgroundColor: COLORS.grayCircleBg, borderWidth: 1, borderColor: COLORS.grayBorder }]} 
+                                    activeOpacity={0.8}
+                                    onPress={() => setPendingRating(true)}
+                                >
+                                    <Text style={[styles.reorderButtonText, { color: COLORS.navy }]}>{t('Rate')}</Text>
+                                </TouchableOpacity>
                                 <TouchableOpacity style={styles.reorderButton} activeOpacity={0.8}>
                                     <Text style={styles.reorderButtonText}>{t('REORDER')}</Text>
                                 </TouchableOpacity>
@@ -122,7 +118,7 @@ export default function ActivitiesScreen() {
                     </View>
                 )}
             </ScrollView>
-        </View>
+        </SafeAreaView>
     );
 }
 

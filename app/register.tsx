@@ -8,15 +8,17 @@ import {
     KeyboardAvoidingView,
     Modal,
     Platform,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     TouchableWithoutFeedback,
-    View
+    View,
+    ToastAndroid,
+    Alert
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 // import { auth, db } from '../src/firebaseConfig'; // TEMPORARILY DISABLED
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../src/store/useAppStore';
@@ -68,7 +70,13 @@ export default function RegisterScreen() {
             // Save user profile dynamically to Zustand
             useAppStore.getState().setUserProfile({ name: `${firstName} ${lastName}`.trim(), phone });
 
-            router.replace('/success');
+            if (Platform.OS === 'android') {
+                ToastAndroid.show(t('Account created successfully. Welcome!'), ToastAndroid.SHORT);
+            } else {
+                Alert.alert(t('Success'), t('Account created successfully. Welcome!'));
+            }
+
+            router.replace('/gps');
         } catch (error: any) {
             alert(t('Registration error: ') + error.message);
         } finally {
@@ -261,7 +269,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingTop: Platform.OS === 'android' ? 40 : 20,
+        paddingTop: 20,
         paddingBottom: 20,
         borderBottomWidth: 1,
         borderBottomColor: '#F3F4F6',
@@ -278,9 +286,10 @@ const styles = StyleSheet.create({
         width: 34,
     },
     scrollContent: {
+        flexGrow: 1,
         paddingHorizontal: 24,
         paddingTop: 30,
-        paddingBottom: 40,
+        paddingBottom: 25,
     },
     title: {
         fontSize: 28,
@@ -384,7 +393,7 @@ const styles = StyleSheet.create({
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         height: '70%',
-        paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+        paddingBottom: 20,
     },
     modalHeader: {
         flexDirection: 'row',
@@ -417,11 +426,12 @@ const styles = StyleSheet.create({
         color: '#0B2545',
     },
     changeRoleBtn: {
+        marginTop: 'auto',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 12,
-        marginTop: 8,
+        paddingTop: 20,
     },
     changeRoleText: { fontSize: 13, color: '#9CA3AF' },
 });

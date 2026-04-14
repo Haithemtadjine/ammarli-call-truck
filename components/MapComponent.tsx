@@ -1,3 +1,3 @@
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
-export { MapView, Marker, Polyline, PROVIDER_GOOGLE };
+import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
+export { MapView, Marker, Polyline, UrlTile };
 export default MapView;
