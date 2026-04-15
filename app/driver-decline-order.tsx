@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../src/store/useAppStore';
 
 const NAVY  = '#003366';
@@ -52,6 +53,7 @@ const REASONS = [
 
 export default function DriverDeclineOrderScreen() {
     const router  = useRouter();
+    const { t }   = useTranslation();
     const insets  = useSafeAreaInsets();
     const { cancelDriverOrder, userRole } = useAppStore();
 
@@ -100,7 +102,7 @@ export default function DriverDeclineOrderScreen() {
                     <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
                         <Ionicons name="arrow-back" size={22} color={NAVY} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>DECLINE REQUEST</Text>
+                    <Text style={styles.headerTitle}>{t('DECLINE REQUEST')}</Text>
                     <View style={{ width: 40 }} />
                 </View>
 
@@ -110,8 +112,8 @@ export default function DriverDeclineOrderScreen() {
                     keyboardShouldPersistTaps="handled"
                 >
                     {/* ── Title ── */}
-                    <Text style={styles.title}>Why are you declining{'\n'}this order?</Text>
-                    <Text style={styles.subtitle}>Select a reason to help us improve your service.</Text>
+                    <Text style={styles.title}>{t('Why are you declining this order?')}</Text>
+                    <Text style={styles.subtitle}>{t('Select a reason to help us improve your service.')}</Text>
 
                     {/* ── Reason Cards ── */}
                     <View style={styles.reasonsList}>
@@ -131,8 +133,8 @@ export default function DriverDeclineOrderScreen() {
 
                                     {/* Text */}
                                     <View style={styles.reasonText}>
-                                        <Text style={styles.reasonLabel}>{reason.label}</Text>
-                                        <Text style={styles.reasonSubtitle}>{reason.subtitle}</Text>
+                                        <Text style={styles.reasonLabel}>{t(reason.label)}</Text>
+                                        <Text style={styles.reasonSubtitle}>{t(reason.subtitle)}</Text>
                                     </View>
 
                                     {/* Radio */}
@@ -145,10 +147,10 @@ export default function DriverDeclineOrderScreen() {
                     </View>
 
                     {/* ── Additional Details ── */}
-                    <Text style={styles.additionalLabel}>ADDITIONAL DETAILS (OPTIONAL)</Text>
+                    <Text style={styles.additionalLabel}>{t('ADDITIONAL DETAILS (OPTIONAL)')}</Text>
                     <TextInput
                         style={styles.noteInput}
-                        placeholder="Provide more context for our support team..."
+                        placeholder={t('Provide more context for our support team...')}
                         placeholderTextColor="#9CA3AF"
                         multiline
                         numberOfLines={4}
@@ -165,11 +167,11 @@ export default function DriverDeclineOrderScreen() {
                             activeOpacity={canConfirm ? 0.85 : 1}
                             disabled={!canConfirm}
                         >
-                            <Text style={styles.confirmBtnText}>CONFIRM DECLINE</Text>
+                            <Text style={styles.confirmBtnText}>{t('CONFIRM DECLINE')}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity onPress={handleBack} style={styles.backLinkBtn}>
-                            <Text style={styles.backLinkText}>Back to Order Details</Text>
+                            <Text style={styles.backLinkText}>{t('Back to Order Details')}</Text>
                         </TouchableOpacity>
                     </View>
                 </ScrollView>

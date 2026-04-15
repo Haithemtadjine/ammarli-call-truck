@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppStore } from '../src/store/useAppStore';
 
 export default function DriverDetailsScreen() {
@@ -10,12 +11,13 @@ export default function DriverDetailsScreen() {
     const { driver } = useAppStore();
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#fff" />
             <Text style={styles.text}>{t('Driver Found!')}: {driver?.name}</Text>
             <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.btn}>
                 <Text style={styles.btnText}>{t('Back to Home')}</Text>
             </TouchableOpacity>
-        </View>
+        </SafeAreaView>
     );
 }
 

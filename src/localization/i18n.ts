@@ -8,27 +8,27 @@ import en from './en.json';
 
 const LANGUAGE_KEY = 'AppLanguage';
 
+// ── Default to Arabic ─────────────────────────────────────────────────────────
+const DEFAULT_LANGUAGE = 'ar';
+
 const languageDetector: any = {
     type: 'languageDetector',
     async: true,
     detect: async (callback: (lang: string) => void) => {
-        if (typeof window === 'undefined') {
-            return callback('en');
-        }
         try {
             const savedLanguage = await AsyncStorage.getItem(LANGUAGE_KEY);
             if (savedLanguage) {
                 return callback(savedLanguage);
             }
-            callback('en');
+            // Default: Arabic
+            callback(DEFAULT_LANGUAGE);
         } catch (error) {
             console.log('Error reading language', error);
-            callback('en');
+            callback(DEFAULT_LANGUAGE);
         }
     },
     init: () => { },
     cacheUserLanguage: async (language: string) => {
-        if (typeof window === 'undefined') return;
         try {
             await AsyncStorage.setItem(LANGUAGE_KEY, language);
         } catch (error) {
@@ -46,7 +46,7 @@ i18n
             en: { translation: en },
             ar: { translation: ar },
         },
-        fallbackLng: 'en',
+        fallbackLng: DEFAULT_LANGUAGE,
         interpolation: {
             escapeValue: false,
         },
@@ -55,15 +55,39 @@ i18n
         },
     });
 
-export const changeLanguage = async (language: string) => {
-    await i18nChangeLanguage(language);
-    const isRTL = language === 'ar';
-
-    if (I18nManager.isRTL !== isRTL) {
+/**
+ * Apply RTL at startup based on stored language.
+ * Call this as early as possible in _layout.tsx.
+ */
+export const applyStoredRTL = async () => {
+    try {
+        const savedLanguage = await AsyncStorage.getItem(LANGUAGE_KEY);
+        const lang = savedLanguage ?? DEFAULT_LANGUAGE;
+        const isRTL = lang === 'ar';
         I18nManager.allowRTL(isRTL);
         I18nManager.forceRTL(isRTL);
-        // Returning true indicates layout changed and app needs reload
-        return true;
+    } catch (e) {
+        // Default to RTL (Arabic)
+        I18nManager.allowRTL(true);
+        I18nManager.forceRTL(true);
+    }
+};
+
+/**
+ * Change language at runtime.
+ * Returns true if RTL direction changed (requires app reload to fully apply).
+ */
+export const changeLanguage = async (language: string): Promise<boolean> => {
+    await AsyncStorage.setItem(LANGUAGE_KEY, language);
+    await i18nChangeLanguage(language);
+
+    const isRTL = language === 'ar';
+    const needsRTLChange = I18nManager.isRTL !== isRTL;
+
+    if (needsRTLChange) {
+        I18nManager.allowRTL(isRTL);
+        I18nManager.forceRTL(isRTL);
+        return true; // Caller must reload the app
     }
     return false;
 };

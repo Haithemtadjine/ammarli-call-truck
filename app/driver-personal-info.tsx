@@ -12,6 +12,7 @@ import {
     View 
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../src/store/useAppStore';
 
 const NAVY = '#003366';
@@ -24,6 +25,7 @@ const BORDER = '#E2E8F0';
 export default function DriverPersonalInfoScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const { t } = useTranslation();
     
     // Get store data
     const driver = useAppStore(s => s.registeredDriver);
@@ -60,7 +62,7 @@ export default function DriverPersonalInfoScreen() {
                 <TouchableOpacity onPress={handleGoBack} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color={NAVY} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Personal Information</Text>
+                <Text style={styles.headerTitle}>{t('Personal Information')}</Text>
                 <View style={{ width: 44 }} />
             </View>
 
@@ -69,19 +71,19 @@ export default function DriverPersonalInfoScreen() {
             <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
                 
                 <Text style={styles.introText}>
-                    Update your account details to keep your profile accurate.
+                    {t('Update your account details to keep your profile accurate.')}
                 </Text>
 
                 {/* Name Input */}
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Full Name</Text>
+                    <Text style={styles.label}>{t('Full Name')}</Text>
                     <View style={styles.inputWrapper}>
                         <Ionicons name="person" size={20} color="#94A3B8" style={styles.inputIcon} />
                         <TextInput 
                             style={styles.input}
                             value={name}
                             onChangeText={setName}
-                            placeholder="Enter your full name"
+                            placeholder={t('Enter your full name')}
                             placeholderTextColor="#94A3B8"
                         />
                     </View>
@@ -89,7 +91,7 @@ export default function DriverPersonalInfoScreen() {
 
                 {/* Phone Input */}
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Phone Number</Text>
+                    <Text style={styles.label}>{t('Phone Number')}</Text>
                     <View style={styles.inputWrapper}>
                         <Ionicons name="call" size={20} color="#94A3B8" style={styles.inputIcon} />
                         <TextInput 
@@ -109,15 +111,15 @@ export default function DriverPersonalInfoScreen() {
                         <Ionicons name="shield-checkmark" size={18} color={NAVY} />
                     </View>
                     <View style={styles.verifiedTextCol}>
-                        <Text style={styles.verifiedTitle}>Account Verified</Text>
-                        <Text style={styles.verifiedSubtitle}>Your identity was verified on May 2024</Text>
+                        <Text style={styles.verifiedTitle}>{t('Account Verified')}</Text>
+                        <Text style={styles.verifiedSubtitle}>{t('Your identity was verified on May 2024')}</Text>
                     </View>
                 </View>
 
                 {/* Bottom Actions */}
                 <View style={styles.bottomContainer}>
                     <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
-                        <Text style={styles.saveBtnText}>Save Changes</Text>
+                        <Text style={styles.saveBtnText}>{t('Save Changes')}</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>

@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const COLORS = {
     navy: '#003366',
@@ -14,7 +14,6 @@ const COLORS = {
 
 export default function SuccessScreen() {
     const router = useRouter();
-    const insets = useSafeAreaInsets();
     const { t } = useTranslation();
 
     const handleContinue = () => {
@@ -23,7 +22,8 @@ export default function SuccessScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
             {/* Main Content Centered */}
             <View style={styles.contentContainer}>
                 {/* Large Checkmark Icon in Yellow Circle */}
@@ -40,7 +40,7 @@ export default function SuccessScreen() {
             </View>
 
             {/* Bottom Button */}
-            <View style={[styles.buttonContainer, { paddingBottom: Math.max(insets.bottom + 20, 40) }]}>
+            <View style={styles.buttonContainer}>
                 <TouchableOpacity
                     style={styles.actionButton}
                     onPress={handleContinue}
@@ -49,7 +49,7 @@ export default function SuccessScreen() {
                     <Text style={styles.actionButtonText}>{t('Continue')}</Text>
                 </TouchableOpacity>
             </View>
-        </View>
+        </SafeAreaView>
     );
 }
 

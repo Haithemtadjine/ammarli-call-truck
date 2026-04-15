@@ -3,10 +3,12 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 export default function DriverDocumentsScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const { t } = useTranslation();
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -14,15 +16,15 @@ export default function DriverDocumentsScreen() {
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color="#003366" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Documents & License</Text>
+                <Text style={styles.headerTitle}>{t('Documents & License')}</Text>
                 <View style={{ width: 44 }} />
             </View>
 
             <View style={styles.content}>
                 <Ionicons name="document-text-outline" size={80} color="#CBD5E1" style={{ marginBottom: 20 }} />
-                <Text style={styles.title}>Coming Soon</Text>
+                <Text style={styles.title}>{t('Coming Soon')}</Text>
                 <Text style={styles.subtitle}>
-                    Upload, view, and renew your driver's license, insurance, and operating permits.
+                    {t('Upload, view, and renew your driver license, insurance, and operating permits.')}
                 </Text>
             </View>
         </View>

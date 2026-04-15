@@ -3,10 +3,12 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 export default function DriverHelpScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const { t } = useTranslation();
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -14,15 +16,15 @@ export default function DriverHelpScreen() {
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color="#003366" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Help & Support</Text>
+                <Text style={styles.headerTitle}>{t('Help & Support')}</Text>
                 <View style={{ width: 44 }} />
             </View>
 
             <View style={styles.content}>
                 <Ionicons name="help-buoy-outline" size={80} color="#CBD5E1" style={{ marginBottom: 20 }} />
-                <Text style={styles.title}>Coming Soon</Text>
+                <Text style={styles.title}>{t('Coming Soon')}</Text>
                 <Text style={styles.subtitle}>
-                    Access FAQs, call dispatcher support, or report an issue with a recent delivery.
+                    {t('Access FAQs, call dispatcher support, or report an issue with a recent delivery.')}
                 </Text>
             </View>
         </View>

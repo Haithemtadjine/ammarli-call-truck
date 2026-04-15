@@ -9,6 +9,7 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 const NAVY = '#003366';
 const YELLOW = '#F3CD0D';
@@ -21,6 +22,7 @@ type Role = 'customer' | 'driver' | null;
 export default function RoleSelectionScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { t } = useTranslation();
     const [selectedRole, setSelectedRole] = useState<Role>(null);
 
     const handleContinue = () => {
@@ -43,8 +45,8 @@ export default function RoleSelectionScreen() {
 
             {/* ── Body ── */}
             <View style={styles.body}>
-                <Text style={styles.title}>Choose Your{'\n'}Experience</Text>
-                <Text style={styles.subtitle}>How would you like to use Ammarli today?</Text>
+                <Text style={styles.title}>{t('Choose Your\nExperience')}</Text>
+                <Text style={styles.subtitle}>{t('How would you like to use Ammarli today?')}</Text>
 
                 {/* Customer Card */}
                 <TouchableOpacity
@@ -61,8 +63,8 @@ export default function RoleSelectionScreen() {
                             <Ionicons name="water" size={28} color="#1E6FD9" />
                         </View>
                         <View style={{ marginTop: 18 }}>
-                            <Text style={styles.cardTitleDark}>Order Water</Text>
-                            <Text style={styles.cardSubDark}>Get premium hydration{'\n'}delivered.</Text>
+                            <Text style={styles.cardTitleDark}>{t('Order Water')}</Text>
+                            <Text style={styles.cardSubDark}>{t('Get premium hydration delivered.')}</Text>
                         </View>
                     </View>
                     <View style={[
@@ -92,8 +94,8 @@ export default function RoleSelectionScreen() {
                             <Ionicons name="bus" size={28} color={WHITE} />
                         </View>
                         <View style={{ marginTop: 18 }}>
-                            <Text style={styles.cardTitleLight}>Work as a Driver</Text>
-                            <Text style={styles.cardSubLight}>Join our elite delivery fleet.</Text>
+                            <Text style={styles.cardTitleLight}>{t('Work as a Driver')}</Text>
+                            <Text style={styles.cardSubLight}>{t('Join our elite delivery fleet.')}</Text>
                         </View>
                     </View>
                     <View style={[
@@ -117,10 +119,10 @@ export default function RoleSelectionScreen() {
                     onPress={handleContinue}
                     activeOpacity={selectedRole ? 0.85 : 1}
                 >
-                    <Text style={styles.continueBtnText}>CONTINUE</Text>
+                    <Text style={styles.continueBtnText}>{t('CONTINUE')}</Text>
                 </TouchableOpacity>
                 <Text style={styles.termsText}>
-                    BY CONTINUING, YOU AGREE TO OUR TERMS OF{'\n'}SERVICE AND PRIVACY POLICY.
+                    {t('BY CONTINUING, YOU AGREE TO OUR TERMS OF SERVICE AND PRIVACY POLICY.')}
                 </Text>
             </View>
         </SafeAreaView>

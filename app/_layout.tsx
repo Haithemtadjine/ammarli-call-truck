@@ -1,29 +1,33 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Location from 'expo-location';
-import { Stack, useRouter } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import '../src/localization/i18n';
-import { ThemeProvider } from '../src/theme/ThemeContext';
+import { applyStoredRTL } from '../src/localization/i18n';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { getUserSession } from "../src/utils/storage";
+import { ThemeProvider } from '../src/theme/ThemeContext';
 
 // Prevent auto-hide so splash stays while we resolve route
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const router = useRouter();
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const prepareApp = async () => {
-      // Small delay just to let UI render initial frames, but generally immediate
-      await SplashScreen.hideAsync();
-    };
+    const prepare = async () => {
+      // 1. Apply RTL direction BEFORE rendering anything
+      await applyStoredRTL();
 
-    prepareApp();
+      // 2. Hide splash
+      await SplashScreen.hideAsync();
+
+      setReady(true);
+    };
+    prepare();
   }, []);
 
-  // Stack is ALWAYS rendered so the navigator is mounted before router.replace() fires
+  // Don't render until RTL is applied — prevents layout flash
+  if (!ready) return null;
+
   return (
     <ThemeProvider>
       <SafeAreaProvider>

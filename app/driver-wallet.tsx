@@ -10,6 +10,7 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import DriverBottomNav from '../src/components/DriverBottomNav';
 import { useAppStore, WeeklyStatDay } from '../src/store/useAppStore';
 
@@ -127,6 +128,7 @@ const chartStyles = StyleSheet.create({
 export default function DriverWalletScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const { t } = useTranslation();
 
     const totalEarnings  = useAppStore((s) => s.totalEarnings);
     const completedTrips = useAppStore((s) => s.completedTrips);
@@ -144,7 +146,7 @@ export default function DriverWalletScreen() {
                 <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
                     <Ionicons name="chevron-back" size={22} color={NAVY} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Earnings</Text>
+                <Text style={styles.headerTitle}>{t('Earnings')}</Text>
                 <TouchableOpacity style={styles.headerBtn}>
                     <Ionicons name="help-circle-outline" size={22} color={NAVY} />
                 </TouchableOpacity>
@@ -159,7 +161,7 @@ export default function DriverWalletScreen() {
                     {/* Decorative circle */}
                     <View style={styles.decorCircle} />
 
-                    <Text style={styles.balanceLabel}>Current Balance</Text>
+                    <Text style={styles.balanceLabel}>{t('Current Balance')}</Text>
                     <View style={styles.balanceAmountRow}>
                         <Text style={styles.balanceValue}>{totalEarnings.toLocaleString()}</Text>
                         <Text style={styles.balanceCurrency}>DA</Text>
@@ -167,7 +169,7 @@ export default function DriverWalletScreen() {
 
                     <TouchableOpacity style={styles.withdrawBtn} activeOpacity={0.85}>
                         <Ionicons name="wallet-outline" size={18} color={NAVY} style={{ marginRight: 8 }} />
-                        <Text style={styles.withdrawText}>Withdraw Funds</Text>
+                        <Text style={styles.withdrawText}>{t('Withdraw Funds')}</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -178,7 +180,7 @@ export default function DriverWalletScreen() {
                         <View style={styles.statIconWrap}>
                             <Ionicons name="car" size={22} color={NAVY} />
                         </View>
-                        <Text style={styles.statLabel}>TOTAL TRIPS</Text>
+                        <Text style={styles.statLabel}>{t('TOTAL TRIPS')}</Text>
                         <Text style={styles.statValue}>{completedTrips}</Text>
                     </View>
 
@@ -187,7 +189,7 @@ export default function DriverWalletScreen() {
                         <View style={[styles.statIconWrap, { backgroundColor: '#FEF9E7' }]}>
                             <Ionicons name="star" size={22} color="#F59E0B" />
                         </View>
-                        <Text style={styles.statLabel}>RATING</Text>
+                        <Text style={styles.statLabel}>{t('RATING')}</Text>
                         <Text style={styles.statValue}>{driverRating.toFixed(1)}</Text>
                     </View>
                 </View>
@@ -199,7 +201,7 @@ export default function DriverWalletScreen() {
                             <Ionicons name="receipt-outline" size={20} color={RED} />
                         </View>
                         <View>
-                            <Text style={styles.commissionTitle}>APP COMMISSION</Text>
+                            <Text style={styles.commissionTitle}>{t('APP COMMISSION')}</Text>
                             <Text style={styles.commissionSubtitle}>المبالغ المستحقة للتطبيق</Text>
                         </View>
                     </View>
@@ -214,8 +216,8 @@ export default function DriverWalletScreen() {
                 {/* ── Weekly stats ── */}
                 <View style={styles.sectionCard}>
                     <View style={styles.sectionHeaderRow}>
-                        <Text style={styles.sectionTitle}>Weekly Stats</Text>
-                        <Text style={styles.sectionSubtitle}>Last 7 Days</Text>
+                        <Text style={styles.sectionTitle}>{t('Weekly Stats')}</Text>
+                        <Text style={styles.sectionSubtitle}>{t('Last 7 Days')}</Text>
                     </View>
                     <WeeklyBarChart stats={weeklyStats} />
                 </View>
@@ -223,16 +225,16 @@ export default function DriverWalletScreen() {
                 {/* ── Recent transactions ── */}
                 <View style={styles.txSection}>
                     <View style={styles.sectionHeaderRow}>
-                        <Text style={styles.sectionTitle}>Recent Transactions</Text>
+                        <Text style={styles.sectionTitle}>{t('Recent Transactions')}</Text>
                         <TouchableOpacity>
-                            <Text style={styles.seeAll}>See All</Text>
+                            <Text style={styles.seeAll}>{t('See All')}</Text>
                         </TouchableOpacity>
                     </View>
 
                     {transactions.length === 0 ? (
                         <View style={styles.emptyTx}>
                             <Ionicons name="receipt-outline" size={36} color={GRAY} />
-                            <Text style={styles.emptyTxText}>No transactions yet</Text>
+                            <Text style={styles.emptyTxText}>{t('No transactions yet')}</Text>
                         </View>
                     ) : (
                         transactions.map((tx) => (
@@ -252,7 +254,7 @@ export default function DriverWalletScreen() {
                                 <View style={styles.txRight}>
                                     <Text style={styles.txAmount}>+{tx.amount.toLocaleString()} DA</Text>
                                     <View style={styles.completedBadge}>
-                                        <Text style={styles.completedBadgeText}>COMPLETED</Text>
+                                        <Text style={styles.completedBadgeText}>{t('COMPLETED')}</Text>
                                     </View>
                                 </View>
                             </View>

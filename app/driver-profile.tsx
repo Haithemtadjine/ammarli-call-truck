@@ -10,6 +10,7 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import DriverBottomNav from '../src/components/DriverBottomNav';
 import { useAppStore } from '../src/store/useAppStore';
 
@@ -73,19 +74,21 @@ function SettingsCard({ iconName, title, subtitle, onPress, isLogout }: Settings
 export default function DriverProfileScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
+    const { t } = useTranslation();
 
     const registeredDriver = useAppStore((s) => s.registeredDriver);
-    const logoutDriver     = useAppStore((s) => s.logoutDriver);
+    const logout           = useAppStore((s) => s.logout);
     const driverRating     = useAppStore((s) => s.driverRating);
 
     const fullName   = registeredDriver?.name ?? 'Ahmed';
     const driverType = registeredDriver?.driverType ?? 'Tanker';
     const roleLabel  = driverType === 'Tanker'
-        ? 'Premium Tanker Operator'
-        : 'Bottled Water Distributor';
+        ? t('Premium Tanker Operator')
+        : t('Bottled Water Distributor');
 
     const handleLogout = () => {
-        logoutDriver(router);
+        logout();
+        router.replace('/login');
     };
 
     return (
@@ -98,7 +101,7 @@ export default function DriverProfileScreen() {
                     <Ionicons name="arrow-back" size={22} color={NAVY} />
                 </TouchableOpacity>
 
-                <Text style={styles.headerTitle}>Profile</Text>
+                <Text style={styles.headerTitle}>{t('Profile')}</Text>
 
                 {/* Bell with red dot */}
                 <TouchableOpacity style={styles.headerIconBtn}>
@@ -136,53 +139,53 @@ export default function DriverProfileScreen() {
                         <Text style={styles.ratingText}>{driverRating.toFixed(1)}</Text>
                         <Ionicons name="star" size={16} color="#F59E0B" style={styles.starIcon} />
                         <View style={styles.separatorDot} />
-                        <Text style={styles.verifiedText}>VERIFIED</Text>
+                        <Text style={styles.verifiedText}>{t('VERIFIED')}</Text>
                     </View>
 
                     <Text style={styles.driverRole}>{roleLabel}</Text>
                 </View>
 
                 {/* ─────────────────────────────── SETTINGS LIST ─────────────────────────── */}
-                <Text style={styles.sectionTitle}>ACCOUNT SETTINGS</Text>
+                <Text style={styles.sectionTitle}>{t('ACCOUNT SETTINGS')}</Text>
 
                 <SettingsCard
                     iconName="time"
-                    title="My Orders"
-                    subtitle="View trip history"
+                    title={t('My Orders')}
+                    subtitle={t('View trip history')}
                     onPress={() => router.push('/driver-trips')}
                 />
                 <SettingsCard
                     iconName="wallet"
-                    title="Wallet"
-                    subtitle="Earnings and transactions"
+                    title={t('Wallet')}
+                    subtitle={t('Earnings and transactions')}
                     onPress={() => router.push('/driver-wallet')}
                 />
                 <SettingsCard
                     iconName="stats-chart"
-                    title="Statistics"
-                    subtitle="Daily and weekly performance"
-                    onPress={() => router.push('/driver-wallet')} // Or specific stats screen
+                    title={t('Statistics')}
+                    subtitle={t('Daily and weekly performance')}
+                    onPress={() => router.push('/driver-wallet')}
                 />
                 <SettingsCard
                     iconName="person"
-                    title="Personal Information"
-                    subtitle="Name, Email, Phone"
+                    title={t('Personal Information')}
+                    subtitle={t('Name, Email, Phone')}
                     onPress={() => router.push('/edit-profile')}
                 />
                 <SettingsCard
                     iconName="help-circle"
-                    title="Help & Support"
-                    subtitle="FAQs and Contact us"
+                    title={t('Help & Support')}
+                    subtitle={t('FAQs and Contact us')}
                     onPress={() => router.push('/help')}
                 />
 
                 {/* ─────────────────────────────── LOGOUT BUTTON ─────────────────────────── */}
                 <SettingsCard
                     iconName="exit"
-                    title="Logout"
+                    title={t('Logout')}
                     subtitle=""
                     isLogout
-                    onPress={() => logoutDriver(router)}
+                    onPress={handleLogout}
                 />
             </ScrollView>
 

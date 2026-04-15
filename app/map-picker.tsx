@@ -50,27 +50,56 @@ export default function MapPickerScreen() {
     useEffect(() => {
       let isMounted = true;
       (async () => {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          alert('يجب تفعيل الـ GPS لتحديد موقعك بدقة');
-          return;
-        }
+        try {
+          let { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') {
+            // Use Algiers as fallback instead of crashing
+            const fallback = {
+              latitude: 36.7538,
+              longitude: 3.0588,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            };
+            if (isMounted) {
+              setRegion(fallback);
+              setAddressText(t('Location permission denied'));
+              setLoading(false);
+            }
+            return;
+          }
 
-        let loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        
-        const exactUserLocation = {
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-          latitudeDelta: 0.005, // Zoomed in completely to street level
-          longitudeDelta: 0.005,
-        };
+          // Use Balanced (not High) to avoid Android timeout
+          let loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
 
-        if (isMounted) {
-          // Fly the camera to the exact GPS location
-          mapRef.current?.animateToRegion(exactUserLocation, 1000);
-          setRegion(exactUserLocation);
-          fetchAddress(exactUserLocation.latitude, exactUserLocation.longitude);
-          setLoading(false);
+          const exactUserLocation = {
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          };
+
+          if (isMounted) {
+            mapRef.current?.animateToRegion(exactUserLocation, 1000);
+            setRegion(exactUserLocation);
+            fetchAddress(exactUserLocation.latitude, exactUserLocation.longitude);
+            setLoading(false);
+          }
+        } catch (err) {
+          // If GPS fails entirely, show Algiers instead of crashing
+          console.warn('[MapPicker] GPS Error:', err);
+          if (isMounted) {
+            const fallback = {
+              latitude: 36.7538,
+              longitude: 3.0588,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            };
+            setRegion(fallback);
+            setAddressText(t('Could not get location'));
+            setLoading(false);
+          }
         }
       })();
       return () => { isMounted = false; };
@@ -149,8 +178,9 @@ export default function MapPickerScreen() {
     const onSearchChange = (text: string) => {
         setSearchText(text);
 
+        // ✅ Use React Native's setTimeout (NOT window.setTimeout — crashes on Android)
         if (searchTimeout.current) {
-            window.clearTimeout(searchTimeout.current);
+            clearTimeout(searchTimeout.current);
         }
 
         if (!text.trim()) {
@@ -158,9 +188,9 @@ export default function MapPickerScreen() {
             return;
         }
 
-        searchTimeout.current = window.setTimeout(() => {
+        searchTimeout.current = setTimeout(() => {
             fetchSuggestions(text);
-        }, 500);
+        }, 500) as any;
     };
 
     const fetchSuggestions = async (query: string) => {

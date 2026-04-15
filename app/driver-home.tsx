@@ -118,8 +118,8 @@ function TankerInventory() {
 // ── BOTTLED INVENTORY ─────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════════
 function BottledInventory() {
-    const inventory = useAppStore((s) => s.inventory.bottled);
     const refillStock = useAppStore((s) => s.refillStock);
+    const stock = BOTTLED_DATA.stock;
 
     return (
         <View style={styles.card}>
@@ -127,13 +127,13 @@ function BottledInventory() {
                 <Text style={styles.cardTitle}>Current Stock</Text>
                 <TouchableOpacity 
                     style={styles.refillSmallBtn}
-                    onPress={() => refillStock('bottled', { size: '1.5L', qty: 50 })} // Simplified refill for now
+                    onPress={() => refillStock('bottled', { brand: 'Ifri', size: '1.5L', qty: 50 })}
                 >
                     <Text style={styles.refillSmallText}>Refill Stock</Text>
                 </TouchableOpacity>
             </View>
             <View style={[styles.row, { justifyContent: 'space-around', marginTop: 18 }]}>
-                {inventory.stock.map((item) => (
+                {stock.map((item) => (
                     <View key={item.size} style={styles.stockCol}>
                         <View style={styles.stockIconBox}>
                             <Ionicons name={item.icon as any} size={26} color={NAVY} />
@@ -149,6 +149,7 @@ function BottledInventory() {
         </View>
     );
 }
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ── ORDER CARD ── (wired to store + navigation)

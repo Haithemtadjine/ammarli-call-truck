@@ -8,6 +8,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAppStore, PastTrip } from '../../src/store/useAppStore';
@@ -52,6 +53,7 @@ const TripCard = ({ trip }: { trip: PastTrip }) => {
 
 export default function DriverTripsScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'Past' | 'Scheduled'>('Past');
   const pastTrips = useAppStore((state: any) => state.pastTrips);
 
@@ -63,7 +65,7 @@ export default function DriverTripsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#003366" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Trips History</Text>
+        <Text style={styles.headerTitle}>{t('Trips History')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -73,13 +75,13 @@ export default function DriverTripsScreen() {
           style={[styles.tab, activeTab === 'Past' && styles.activeTab]} 
           onPress={() => setActiveTab('Past')}
         >
-          <Text style={[styles.tabText, activeTab === 'Past' && styles.activeTabText]}>Past</Text>
+          <Text style={[styles.tabText, activeTab === 'Past' && styles.activeTabText]}>{t('Past')}</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.tab, activeTab === 'Scheduled' && styles.activeTab]} 
           onPress={() => setActiveTab('Scheduled')}
         >
-          <Text style={[styles.tabText, activeTab === 'Scheduled' && styles.activeTabText]}>Scheduled</Text>
+          <Text style={[styles.tabText, activeTab === 'Scheduled' && styles.activeTabText]}>{t('Scheduled')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -90,13 +92,13 @@ export default function DriverTripsScreen() {
           ) : (
             <View style={styles.emptyContainer}>
               <Ionicons name="document-text-outline" size={64} color="#CBD5E1" />
-              <Text style={styles.emptyText}>No past trips found</Text>
+              <Text style={styles.emptyText}>{t('No past trips found')}</Text>
             </View>
           )
         ) : (
           <View style={styles.emptyContainer}>
             <Ionicons name="calendar-outline" size={64} color="#CBD5E1" />
-            <Text style={styles.emptyText}>No scheduled trips</Text>
+            <Text style={styles.emptyText}>{t('No scheduled trips')}</Text>
           </View>
         )}
       </ScrollView>

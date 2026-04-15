@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { changeLanguage } from '../src/localization/i18n';
 import { useAppStore } from '../src/store/useAppStore';
 import { useTheme } from '../src/theme/ThemeContext';
+import { mf, s, vs } from '../src/utils/responsive';
 
 export default function SettingsScreen() {
     const { colors, isDarkMode, toggleTheme } = useTheme();
@@ -27,7 +28,13 @@ export default function SettingsScreen() {
         setLangModalVisible(false);
         const needsReload = await changeLanguage(lang);
         if (needsReload) {
-            alert('Language changed. Please restart the app to apply layout direction changes completely.');
+            Alert.alert(
+                lang === 'ar' ? 'تم تغيير اللغة' : 'Language Changed',
+                lang === 'ar'
+                    ? 'أغلق التطبيق وأعد فتحه لتطبيق التخطيط العربي بشكل كامل.'
+                    : 'Please close and reopen the app to apply the new layout direction.',
+                [{ text: lang === 'ar' ? 'حسناً' : 'OK' }]
+            );
         }
     };
 
@@ -286,37 +293,37 @@ const getStyles = (COLORS: any) => StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingBottom: 20,
+        paddingHorizontal: s(20),
+        paddingBottom: vs(20),
     },
     backButton: {
-        padding: 8,
-        marginLeft: -8,
+        padding: s(8),
+        marginLeft: s(-8),
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: mf(20),
         fontWeight: '700',
         color: COLORS.navy,
     },
     backButtonPlaceholder: {
-        width: 44, // Matches backButton hit area approximately to keep title centered
+        width: s(44),
     },
     scrollContent: {
-        paddingHorizontal: 20,
-        paddingBottom: 40,
+        paddingHorizontal: s(20),
+        paddingBottom: vs(40),
     },
     sectionTitle: {
-        fontSize: 13,
+        fontSize: mf(13),
         fontWeight: '700',
         color: COLORS.textSecondary,
-        marginBottom: 8,
-        marginTop: 24,
+        marginBottom: vs(8),
+        marginTop: vs(24),
         letterSpacing: 0.5,
     },
     card: {
         backgroundColor: COLORS.surface,
-        borderRadius: 16,
-        paddingVertical: 4,
+        borderRadius: s(16),
+        paddingVertical: vs(4),
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
@@ -327,18 +334,18 @@ const getStyles = (COLORS: any) => StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 16,
-        paddingHorizontal: 16,
+        paddingVertical: vs(16),
+        paddingHorizontal: s(16),
     },
     rowLeft: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     rowIcon: {
-        marginRight: 16,
+        marginRight: s(16),
     },
     rowTitle: {
-        fontSize: 16,
+        fontSize: mf(16),
         fontWeight: '500',
     },
     rowRight: {
@@ -346,35 +353,35 @@ const getStyles = (COLORS: any) => StyleSheet.create({
         alignItems: 'center',
     },
     rightText: {
-        fontSize: 16,
+        fontSize: mf(16),
         color: COLORS.textSecondary,
-        marginRight: 8,
+        marginRight: s(8),
     },
     chevron: {
-        marginLeft: 4,
+        marginLeft: s(4),
     },
     divider: {
         height: 1,
         backgroundColor: COLORS.border,
-        marginLeft: 54, // Align with text start
-        marginRight: 16,
+        marginLeft: s(54),
+        marginRight: s(16),
     },
     logoutButton: {
         backgroundColor: COLORS.accent,
-        paddingVertical: 16,
-        borderRadius: 30, // Pill shape
+        paddingVertical: vs(16),
+        borderRadius: s(30),
         alignItems: 'center',
-        marginTop: 40,
-        marginBottom: 16,
+        marginTop: vs(40),
+        marginBottom: vs(16),
     },
     logoutText: {
-        color: '#003366', // Keep this text explicit or map to something else, since accent is yellow
-        fontSize: 16,
+        color: '#003366',
+        fontSize: mf(16),
         fontWeight: '700',
     },
     versionText: {
         color: COLORS.textSecondary,
-        fontSize: 13,
+        fontSize: mf(13),
         textAlign: 'center',
     },
     modalOverlay: {
@@ -386,24 +393,24 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     modalContainer: {
         width: '85%',
         backgroundColor: COLORS.surface,
-        borderRadius: 20,
-        padding: 24,
+        borderRadius: s(20),
+        padding: s(24),
     },
     modalTitle: {
-        fontSize: 18,
+        fontSize: mf(18),
         fontWeight: '700',
         color: COLORS.textPrimary,
-        marginBottom: 20,
+        marginBottom: vs(20),
         textAlign: 'center',
     },
     langOption: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 16,
+        paddingVertical: vs(16),
     },
     langOptionText: {
-        fontSize: 16,
+        fontSize: mf(16),
         color: COLORS.textPrimary,
     },
     langOptionSelectedText: {
@@ -414,34 +421,34 @@ const getStyles = (COLORS: any) => StyleSheet.create({
         backgroundColor: COLORS.border,
     },
     modalCancelButton: {
-        marginTop: 24,
+        marginTop: vs(24),
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: vs(12),
     },
     modalCancelText: {
-        fontSize: 16,
+        fontSize: mf(16),
         fontWeight: '600',
         color: COLORS.textSecondary,
     },
     textInput: {
         borderWidth: 1,
         borderColor: COLORS.border,
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        height: 50,
-        marginBottom: 16,
+        borderRadius: s(12),
+        paddingHorizontal: s(16),
+        height: vs(50),
+        marginBottom: vs(16),
         color: COLORS.textPrimary,
         backgroundColor: COLORS.background,
     },
     saveModalButton: {
         backgroundColor: COLORS.accent,
-        borderRadius: 12,
-        paddingVertical: 14,
+        borderRadius: s(12),
+        paddingVertical: vs(14),
         alignItems: 'center',
-        marginTop: 8,
+        marginTop: vs(8),
     },
     saveModalButtonText: {
-        fontSize: 16,
+        fontSize: mf(16),
         fontWeight: '700',
         color: '#003366',
     },
