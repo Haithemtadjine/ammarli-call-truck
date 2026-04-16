@@ -1,300 +1,233 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  Dimensions,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-const NAVY = '#003366';
-const YELLOW = '#F3CD0D';
-const CREAM = '#FAFAF0';
-const GRAY = '#6B7280';
-const WHITE = '#FFFFFF';
+const { width } = Dimensions.get('window');
+
+const COLORS = {
+  primary: '#0084FF', // لون زر المتابعة
+  customerBlue: '#00ADEF', // لون بطاقة اطلب ماء
+  driverNavy: '#001D3D', // لون بطاقة اعمل كسائق
+  textDark: '#002D58',
+  textGray: '#64748B',
+  white: '#FFFFFF',
+  background: '#FFFFFF',
+};
 
 type Role = 'customer' | 'driver' | null;
 
 export default function RoleSelectionScreen() {
-    const router = useRouter();
-    const insets = useSafeAreaInsets();
-    const { t } = useTranslation();
-    const [selectedRole, setSelectedRole] = useState<Role>(null);
+  const router = useRouter();
+  const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+  const [selectedRole, setSelectedRole] = useState<Role>('customer'); // Default to customer as per snippet
 
-    const handleContinue = () => {
-        if (!selectedRole) return;
-        if (selectedRole === 'customer') {
-            router.push('/login');
-        } else {
-            router.push('/driver-login');
-        }
-    };
+  const handleContinue = () => {
+    if (!selectedRole) return;
+    if (selectedRole === 'customer') {
+      router.push('/login');
+    } else {
+      router.push('/driver-login');
+    }
+  };
 
-    return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+  return (
+    <SafeAreaView style={[styles.container, { paddingTop: Math.max(insets.top, 20) }]}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+      
+      {/* Logo */}
+      <View style={styles.header}>
+        <Text style={styles.logoText}>Ammarli</Text>
+      </View>
 
-            {/* ── Header ── */}
-            <View style={styles.header}>
-                <Text style={styles.brandText}>AMMARLI</Text>
+      <View style={styles.content}>
+        {/* Titles */}
+        <Text style={styles.mainTitle}>{t('Choose Your\nExperience')}</Text>
+        <Text style={styles.subTitle}>{t('How would you like to use Ammarli today?')}</Text>
+
+        {/* Role Cards Container */}
+        <View style={styles.cardsContainer}>
+          
+          {/* Customer Card (اطلب ماء) */}
+          <TouchableOpacity 
+            activeOpacity={0.9}
+            onPress={() => setSelectedRole('customer')}
+            style={[
+              styles.roleCard, 
+              { backgroundColor: COLORS.customerBlue },
+              selectedRole === 'customer' && styles.selectedCard
+            ]}
+          >
+            <MaterialCommunityIcons name="water-outline" size={40} color={COLORS.white} style={styles.cardIcon} />
+            <View style={styles.cardTextContainer}>
+              <Text style={styles.cardTitle}>{t('Order Water')}</Text>
+              <Text style={styles.cardDesc}>{t('Get premium hydration delivered.')}</Text>
             </View>
-
-            {/* ── Body ── */}
-            <View style={styles.body}>
-                <Text style={styles.title}>{t('Choose Your\nExperience')}</Text>
-                <Text style={styles.subtitle}>{t('How would you like to use Ammarli today?')}</Text>
-
-                {/* Customer Card */}
-                <TouchableOpacity
-                    style={[
-                        styles.card,
-                        styles.cardCustomer,
-                        selectedRole === 'customer' && styles.cardSelected,
-                    ]}
-                    onPress={() => setSelectedRole('customer')}
-                    activeOpacity={0.85}
-                >
-                    <View style={styles.cardLeft}>
-                        <View style={styles.iconWrapCustomer}>
-                            <Ionicons name="water" size={28} color="#1E6FD9" />
-                        </View>
-                        <View style={{ marginTop: 18 }}>
-                            <Text style={styles.cardTitleDark}>{t('Order Water')}</Text>
-                            <Text style={styles.cardSubDark}>{t('Get premium hydration delivered.')}</Text>
-                        </View>
-                    </View>
-                    <View style={[
-                        styles.arrowCircle,
-                        selectedRole === 'customer' && styles.arrowCircleSelected,
-                    ]}>
-                        <Ionicons
-                            name="chevron-forward"
-                            size={16}
-                            color={selectedRole === 'customer' ? WHITE : NAVY}
-                        />
-                    </View>
-                </TouchableOpacity>
-
-                {/* Driver Card */}
-                <TouchableOpacity
-                    style={[
-                        styles.card,
-                        styles.cardDriver,
-                        selectedRole === 'driver' && styles.cardDriverSelected,
-                    ]}
-                    onPress={() => setSelectedRole('driver')}
-                    activeOpacity={0.85}
-                >
-                    <View style={styles.cardLeft}>
-                        <View style={styles.iconWrapDriver}>
-                            <Ionicons name="bus" size={28} color={WHITE} />
-                        </View>
-                        <View style={{ marginTop: 18 }}>
-                            <Text style={styles.cardTitleLight}>{t('Work as a Driver')}</Text>
-                            <Text style={styles.cardSubLight}>{t('Join our elite delivery fleet.')}</Text>
-                        </View>
-                    </View>
-                    <View style={[
-                        styles.arrowCircle,
-                        styles.arrowCircleDriver,
-                        selectedRole === 'driver' && styles.arrowCircleDriverSelected,
-                    ]}>
-                        <Ionicons
-                            name="chevron-forward"
-                            size={16}
-                            color={WHITE}
-                        />
-                    </View>
-                </TouchableOpacity>
+            <Ionicons name="chevron-forward" size={24} color={COLORS.white} />
+            
+            {/* Wave Decoration (Simplified) */}
+            <View style={styles.waveOverlay}>
+               <Text style={styles.waveText}>~~~~~~</Text>
             </View>
+          </TouchableOpacity>
 
-            {/* ── Footer ── */}
-            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 24) }]}>
-                <TouchableOpacity
-                    style={[styles.continueBtn, !selectedRole && styles.continueBtnDisabled]}
-                    onPress={handleContinue}
-                    activeOpacity={selectedRole ? 0.85 : 1}
-                >
-                    <Text style={styles.continueBtnText}>{t('CONTINUE')}</Text>
-                </TouchableOpacity>
-                <Text style={styles.termsText}>
-                    {t('BY CONTINUING, YOU AGREE TO OUR TERMS OF SERVICE AND PRIVACY POLICY.')}
-                </Text>
+          {/* Driver Card (اعمل كسائق) */}
+          <TouchableOpacity 
+            activeOpacity={0.9}
+            onPress={() => setSelectedRole('driver')}
+            style={[
+              styles.roleCard, 
+              { backgroundColor: COLORS.driverNavy },
+              selectedRole === 'driver' && styles.selectedCard
+            ]}
+          >
+            <MaterialCommunityIcons name="truck-delivery-outline" size={40} color={COLORS.white} style={styles.cardIcon} />
+            <View style={styles.cardTextContainer}>
+              <Text style={styles.cardTitle}>{t('Work as a Driver')}</Text>
+              <Text style={styles.cardDesc}>{t('Join our elite delivery fleet.')}</Text>
             </View>
-        </SafeAreaView>
-    );
+            <Ionicons name="chevron-forward" size={24} color={COLORS.white} />
+          </TouchableOpacity>
+
+        </View>
+      </View>
+
+      {/* Footer Section */}
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+        <TouchableOpacity 
+          style={[styles.continueBtn, !selectedRole && { opacity: 0.5 }]} 
+          onPress={handleContinue}
+          disabled={!selectedRole}
+        >
+          <Text style={styles.continueBtnText}>{t('CONTINUE')}</Text>
+        </TouchableOpacity>
+        <Text style={styles.termsText}>
+          {t('BY CONTINUING, YOU AGREE TO OUR TERMS OF SERVICE AND PRIVACY POLICY.')}
+        </Text>
+      </View>
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: WHITE,
-    },
-
-    // ── Header
-    header: {
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 14,
-    },
-    brandText: {
-        fontSize: 15,
-        fontWeight: '900',
-        color: NAVY,
-        letterSpacing: 3,
-    },
-
-    // ── Body
-    body: {
-        flex: 1,
-        paddingHorizontal: 24,
-        paddingTop: 30,
-    },
-    title: {
-        fontSize: 34,
-        fontWeight: '900',
-        color: NAVY,
-        lineHeight: 42,
-        marginBottom: 10,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: GRAY,
-        lineHeight: 22,
-        marginBottom: 36,
-    },
-
-    // ── Cards
-    card: {
-        borderRadius: 22,
-        padding: 24,
-        marginBottom: 18,
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        justifyContent: 'space-between',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        elevation: 4,
-    },
-    cardSelected: {
-        borderWidth: 2.5,
-        borderColor: '#1E6FD9',
-    },
-    cardCustomer: {
-        backgroundColor: CREAM,
-        minHeight: 160,
-    },
-    cardDriver: {
-        backgroundColor: NAVY,
-        minHeight: 160,
-    },
-    cardDriverSelected: {
-        borderWidth: 2.5,
-        borderColor: YELLOW,
-    },
-    cardLeft: {
-        flex: 1,
-    },
-    iconWrapCustomer: {
-        width: 48,
-        height: 48,
-        borderRadius: 14,
-        backgroundColor: '#E8F0FE',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    iconWrapDriver: {
-        width: 48,
-        height: 48,
-        borderRadius: 14,
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    cardTitleDark: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: NAVY,
-        marginBottom: 4,
-    },
-    cardSubDark: {
-        fontSize: 14,
-        color: GRAY,
-        lineHeight: 20,
-    },
-    cardTitleLight: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: WHITE,
-        marginBottom: 4,
-    },
-    cardSubLight: {
-        fontSize: 14,
-        color: 'rgba(255,255,255,0.7)',
-        lineHeight: 20,
-    },
-
-    // Arrow circle
-    arrowCircle: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: 'rgba(0,0,0,0.08)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        alignSelf: 'flex-end',
-    },
-    arrowCircleSelected: {
-        backgroundColor: NAVY,
-    },
-    arrowCircleDriver: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-    },
-    arrowCircleDriverSelected: {
-        backgroundColor: YELLOW,
-    },
-
-    // ── Footer
-    footer: {
-        paddingHorizontal: 24,
-        paddingTop: 16,
-        alignItems: 'center',
-    },
-    continueBtn: {
-        width: '100%',
-        backgroundColor: YELLOW,
-        paddingVertical: 20,
-        borderRadius: 18,
-        alignItems: 'center',
-        marginBottom: 14,
-        shadowColor: YELLOW,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
-        elevation: 6,
-    },
-    continueBtnDisabled: {
-        opacity: 0.45,
-        shadowOpacity: 0,
-        elevation: 0,
-    },
-    continueBtnText: {
-        fontSize: 16,
-        fontWeight: '900',
-        color: NAVY,
-        letterSpacing: 2,
-    },
-    termsText: {
-        fontSize: 10,
-        color: '#9CA3AF',
-        textAlign: 'center',
-        letterSpacing: 0.3,
-        lineHeight: 16,
-    },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  logoText: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#00ADEF',
+    letterSpacing: -1,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 30,
+    alignItems: 'center',
+  },
+  mainTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: COLORS.textDark,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  subTitle: {
+    fontSize: 16,
+    color: COLORS.textGray,
+    textAlign: 'center',
+    marginBottom: 40,
+  },
+  cardsContainer: {
+    width: '100%',
+  },
+  roleCard: {
+    width: '100%',
+    height: 110,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    overflow: 'hidden',
+  },
+  selectedCard: {
+    borderWidth: 3,
+    borderColor: '#E0E0E0',
+  },
+  cardTextContainer: {
+    flex: 1,
+    alignItems: 'flex-start', // Because layout is RTL, flex-start will be on the right in RTL, but we need to ensure it matches the image. Actually, with 'row', React Native automatically flips.
+    marginHorizontal: 15,
+  },
+  cardTitle: {
+    color: COLORS.white,
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'left', // will be flipped to right in RTL
+  },
+  cardDesc: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    marginTop: 5,
+    textAlign: 'left',
+  },
+  cardIcon: {
+    opacity: 0.9,
+  },
+  waveOverlay: {
+    position: 'absolute',
+    bottom: -10,
+    right: 0,
+    opacity: 0.2,
+  },
+  waveText: {
+    color: COLORS.white,
+    fontSize: 40,
+    letterSpacing: 2,
+  },
+  footer: {
+    paddingHorizontal: 30,
+    alignItems: 'center',
+  },
+  continueBtn: {
+    width: '100%',
+    height: 52,
+    backgroundColor: COLORS.primary,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    marginBottom: 20,
+  },
+  continueBtnText: {
+    color: COLORS.white,
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  termsText: {
+    fontSize: 11,
+    color: COLORS.textGray,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
 });
